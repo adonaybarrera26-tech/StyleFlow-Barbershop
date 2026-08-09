@@ -38,7 +38,7 @@ const AboutProject: React.FC = () => {
           <ul className="space-y-3 text-sm text-slate-300">
             <li className="flex items-center gap-2">✓ {language === 'fa' ? 'پشتیبانی کامل از دو زبان و RTL' : 'Full Bilingual and RTL support'}</li>
             <li className="flex items-center gap-2">✓ {language === 'fa' ? 'سیستم مدیریت نوبت‌ها' : 'Appointment Management System'}</li>
-            <li className="flex items-center gap-2">✓ {language === 'fa' ? 'هوش مصنوعی Gemini برای مشاوره' : 'Gemini AI for consultation'}</li>
+            <li className="flex items-center gap-2">✓ {language === 'fa' ? 'ذخیره‌سازی آفلاین در مرورگر' : 'Offline-First LocalStorage'}</li>
             <li className="flex items-center gap-2">✓ {language === 'fa' ? 'طراحی ریسپانسیو و Dark Mode' : 'Responsive Design & Dark Mode'}</li>
           </ul>
         </motion.div>

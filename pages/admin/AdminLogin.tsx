@@ -37,7 +37,7 @@ const AdminLogin: React.FC = () => {
             <Lock size={36} />
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-center text-white mb-8">ورود مدیر آرسس کلاب</h2>
+        <h2 className="text-2xl font-bold text-center text-white mb-8">ورود مدیر استایلفلو</h2>
         
         <form onSubmit={handleLogin} className="space-y-5">
           <div>

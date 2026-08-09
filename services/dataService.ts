@@ -3,9 +3,9 @@ import { INITIAL_SERVICES, DEFAULT_SETTINGS } from '../constants';
 
 // کلیدهای ذخیره‌سازی در مرورگر
 const STORAGE_KEYS = {
-  SERVICES: 'curses_club_services',
-  BOOKINGS: 'curses_club_bookings',
-  SETTINGS: 'curses_club_settings'
+  SERVICES: 'styleflow_services',
+  BOOKINGS: 'styleflow_bookings',
+  SETTINGS: 'styleflow_settings'
 };
 
 // تابع کمکی برای خواندن از LocalStorage

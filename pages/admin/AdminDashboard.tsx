@@ -119,7 +119,7 @@ const AdminDashboard: React.FC = () => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Bookings");
-    XLSX.writeFile(wb, showTodayOnly ? "ArsesClub_Today.xlsx" : "ArsesClub_All_Bookings.xlsx");
+    XLSX.writeFile(wb, showTodayOnly ? "StyleFlow_Today.xlsx" : "StyleFlow_All_Bookings.xlsx");
   };
 
   // Generic Print Function (Handles both "Print All" and "Print Day")
@@ -159,7 +159,7 @@ const AdminDashboard: React.FC = () => {
                   </style>
               </head>
               <body>
-                  <h1>آرسس کلاب</h1>
+                  <h1>استایلفلو</h1>
                   <div class="meta">گزارش نوبت‌دهی: ${title}</div>
                   
                   ${sortedKeys.map(dateKey => {
@@ -347,7 +347,7 @@ const AdminDashboard: React.FC = () => {
       )}
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <h2 className="text-3xl font-black text-white">داشبورد مدیریت آرسس</h2>
+        <h2 className="text-3xl font-black text-white">داشبورد مدیریت استایلفلو</h2>
         <button onClick={logout} className="text-red-400 hover:text-red-300 text-sm font-medium border border-red-500/20 px-4 py-2 rounded-lg hover:bg-red-500/10 transition-colors">خروج از حساب</button>
       </div>
 

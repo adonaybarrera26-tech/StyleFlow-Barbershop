@@ -1,75 +1,89 @@
+# StyleFlow Barbershop 💈
+
 **English** | [نسخه فارسی](./README_fa.md)
 
-# StyleFlow Barbershop 💈 (By ErPyCode)
+A modern, bilingual (Persian/English) barbershop booking app built with React, TypeScript and Vite. Designed as a portfolio demo — fully offline-first with no backend required.
 
-A modern, full-stack barbershop booking application designed with a focus on User Experience (UX) and User Interface (UI). This project is developed to be bilingual (Persian/English) and uses local storage for a seamless offline-first demo experience.
+> **🌐 Live Demo:** https://erpycode.github.io/StyleFlow-Barbershop/
 
-## 🚀 Key Features
-- **Bilingual Support (i18n):** Seamlessly switch between Persian (RTL) and English (LTR) across the entire application.
-- **Custom Branding:** Integrated **ErPyCode** personal branding and digital signatures throughout the UI.
-- **Offline-First Storage:** Uses Browser LocalStorage to persist data without the need for a database (Perfect for portfolio demos).
-- **Smart AI Assistant:** Integrated Google Gemini AI to answer customer queries and provide style consultations.
-- **Advanced Admin Panel:** Complete management of services, appointments, and shop settings.
+## ✨ Features
 
-## ✒️ Digital Signature & Copyright
-This project was designed and developed by **ErPyCode**.
+- **Bilingual + RTL** — one-click switch between Persian (RTL) and English (LTR)
+- **Online Booking** — 3-step flow: choose services → pick date & time → confirm
+- **Admin Panel** — manage services, bookings, and shop settings
+- **Excel Export & Print** — download daily/all bookings as `.xlsx` or print a report
+- **Offline-First Storage** — everything persists in the browser's LocalStorage, no database needed
+- **Polished UI** — dark theme, Vazirmatn font, smooth Motion animations
+- **Responsive** — works great on mobile and desktop
 
-**Usage Terms:**
-You are free to use this project in your portfolio or for your own projects, provided that:
-1. You credit the original developer (**ErPyCode**) in your project's Credits section or README file.
-2. You do not remove the digital signatures present in the code or UI without permission.
-3. If significant changes are made, please still link back to the original source.
+## 🧰 Tech Stack
 
-## 🛠 Tech Stack
-- **Frontend:** React.js, Vite, Tailwind CSS
-- **State & Storage:** LocalStorage API
-- **AI Integration:** Google Gemini API
-- **Animations:** Framer Motion (via Motion for React)
-- **Icons:** Lucide React
+| Layer    | Tech |
+|----------|------|
+| Frontend | React 18, TypeScript, Vite 5 |
+| Styling  | Tailwind CSS (CDN) |
+| Routing  | React Router (HashRouter) |
+| Animation| Motion |
+| Icons    | Lucide React |
+| Export   | xlsx |
+| Storage  | LocalStorage |
+
+## 🔑 Demo Credentials
+
+| Role  | Username | Password |
+|-------|----------|----------|
+| Admin | `admin`  | `admin`  |
+
+> ⚠️ Demo only — data lives in the browser and is never sent to a server.
 
 ## 📦 Quick Start
 
-1. Clone the repository:
 ```bash
-git clone https://github.com/ErPyCode/styleflow-barbershop.git
-```
-
-2. Install dependencies:
-```bash
+git clone https://github.com/erpycode/StyleFlow-Barbershop.git
+cd StyleFlow-Barbershop
 npm install
-```
-
-3. Create a `.env` file and add your Gemini API key:
-```env
-GEMINI_API_KEY=your_key_here
-```
-
-4. Run the development server:
-```bash
 npm run dev
 ```
 
-## 🗄 Database Integration (Optional)
-By default, this project uses `LocalStorage`. If you wish to connect it to a real database like Supabase:
+Build for production:
 
-1. Open `supabaseClient.ts` and initialize your Supabase client.
-2. In `services/dataService.ts`, replace the LocalStorage logic with Supabase fetch/upsert calls.
-3. Define your `bookings` and `services` tables following the structures mentioned in the project documentation.
+```bash
+npm run build   # outputs to dist/
+npm run preview # preview the build locally
+```
 
-## 🎨 Customization
-- **Remove "About Project" Page:** Simply remove the `/about` route in `App.tsx` and hide the navigation items in `components/Layout.tsx`.
-- **Update Contact Info:** Social links and contact details are located in `pages/AboutProject.tsx`.
-- **Change Branding:** Project titles and banners can be updated in `services/LanguageContext.tsx`.
+## ☁️ Deployment
+
+The project deploys to **GitHub Pages** automatically via GitHub Actions (see `.github/workflows/deploy.yml`) — every push to `main` builds and publishes the site.
+
+Manual alternative: `npm run build` and upload the `dist/` folder to any static host (Netlify, Vercel, Cloudflare Pages). No server-side configuration needed — it's 100% static.
+
+## 📁 Project Structure
+
+```
+├── pages/
+│   ├── Home.tsx              # Landing page
+│   ├── AboutProject.tsx      # About / credits
+│   ├── user/                 # Booking flow + success receipt
+│   └── admin/                # Admin login + dashboard
+├── services/
+│   ├── LanguageContext.tsx   # i18n (FA/EN)
+│   └── dataService.ts        # LocalStorage data layer
+├── components/Layout.tsx     # App shell + navigation
+├── constants.ts              # Default services & settings
+└── types.ts
+```
+
+## ✍️ Credit & Usage Terms
+
+Designed and developed by **ErPyCode**.
+
+You are free to use this project in your portfolio or your own projects, provided that:
+
+1. You credit the original developer (**ErPyCode**) in your Credits section or README file
+2. You do not remove the digital signatures present in the code or UI without permission
+3. If significant changes are made, please still link back to the original source
 
 ---
-Crafted with ❤️ by @ErPyCode
-<a href="https://github.com/ErPyCode">GitHub</a> | <a href="https://t.me/ErPyCode">Telegram</a> | <a href="mailto:ErPyCode@hotmail.com">Email</a>
 
-
-## 👤 Admin Access
-- **URL:** `/admin/login`
-- **Default Username:** `admin`
-- **Default Password:** `admin`
-
----
-Designed for portfolio showcase.
+Made with ❤️ by [ErPyCode](https://github.com/erpycode)

@@ -35,7 +35,7 @@ const SuccessPage: React.FC = () => {
         <div className="pt-14 pb-8 px-8 text-center space-y-6">
             <div>
                 <h2 className="text-2xl font-black text-white">نوبت شما رزرو شد!</h2>
-                <p className="text-slate-400 text-sm mt-2">رسید نوبت آرایشگاه آرسس کلاب</p>
+                <p className="text-slate-400 text-sm mt-2">رسید نوبت آرایشگاه استایلفلو</p>
             </div>
 
             {/* Ticket Details */}
