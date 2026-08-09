@@ -109,17 +109,34 @@ const BookingPage: React.FC = () => {
     }
 
     // Generate Base Slots
-    let slots = generateTimeSlots(shopSettings);
+    const slots = generateTimeSlots(shopSettings);
 
-    // Filter booked slots
-    const takenSlots = allBookings
-        .filter(b => {
-            const bookingDate = new Date(b.date);
-            return bookingDate.toDateString() === dateString;
-        })
-        .map(b => b.timeSlot);
+    // Helper: convert "HH:MM" to minutes since midnight
+    const toMinutes = (time: string) => {
+        const [h, m] = time.split(':').map(Number);
+        return h * 60 + m;
+    };
 
-    let free = slots.filter(slot => !takenSlots.includes(slot));
+    // Bookings on the selected day
+    const dayBookings = allBookings.filter(b => {
+        const bookingDate = new Date(b.date);
+        return bookingDate.toDateString() === dateString;
+    });
+
+    // A slot is taken if it overlaps with any booking's time window
+    // (booking start -> start + totalDuration). This prevents double-booking
+    // even when a service takes longer than one slot.
+    const isSlotTaken = (slot: string) => {
+        const slotStart = toMinutes(slot);
+        const slotEnd = slotStart + shopSettings.slotInterval;
+        return dayBookings.some(b => {
+            const bookingStart = toMinutes(b.timeSlot);
+            const bookingEnd = bookingStart + (b.totalDuration || shopSettings.slotInterval);
+            return slotStart < bookingEnd && slotEnd > bookingStart;
+        });
+    };
+
+    let free = slots.filter(slot => !isSlotTaken(slot));
     
     // Check if selected date is today, and filter out passed times
     const now = new Date();
