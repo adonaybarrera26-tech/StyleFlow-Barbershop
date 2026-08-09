@@ -15,6 +15,7 @@ const BookingPage: React.FC = () => {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
   
   // State for available slots & settings
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
@@ -175,46 +176,47 @@ const BookingPage: React.FC = () => {
   const totalDuration = selectedServices.reduce((sum, s) => sum + s.durationMinutes, 0);
 
   const handleBooking = async () => {
-    if (!customerName || !customerPhone) {
-      alert('لطفا نام و شماره تماس خود را وارد کنید');
-      return;
-    }
-    setLoading(true);
-    try {
-      await createBooking({
-        customerName,
-        customerPhone,
-        selectedServices,
-        totalPrice,
-        totalDuration,
-        date: selectedDate.toISOString(),
-        timeSlot: selectedTime
-      });
+      if (!customerName || !customerPhone) {
+        setFormError('لطفا نام و شماره تماس خود را وارد کنید');
+        return;
+      }
+      setFormError('');
+      setLoading(true);
+      try {
+        await createBooking({
+          customerName,
+          customerPhone,
+          selectedServices,
+          totalPrice,
+          totalDuration,
+          date: selectedDate.toISOString(),
+          timeSlot: selectedTime
+        });
       
-      // Format date manually to ensure "Day Month Year" order (RTL friendly)
-      const d = selectedDate;
-      const day = new Intl.DateTimeFormat('fa-IR', { day: 'numeric' }).format(d);
-      const month = new Intl.DateTimeFormat('fa-IR', { month: 'long' }).format(d);
-      const year = new Intl.DateTimeFormat('fa-IR', { year: 'numeric' }).format(d).replace(/,/g, '');
-      const weekday = new Intl.DateTimeFormat('fa-IR', { weekday: 'long' }).format(d);
+        // Format date manually to ensure "Day Month Year" order (RTL friendly)
+        const d = selectedDate;
+        const day = new Intl.DateTimeFormat('fa-IR', { day: 'numeric' }).format(d);
+        const month = new Intl.DateTimeFormat('fa-IR', { month: 'long' }).format(d);
+        const year = new Intl.DateTimeFormat('fa-IR', { year: 'numeric' }).format(d).replace(/,/g, '');
+        const weekday = new Intl.DateTimeFormat('fa-IR', { weekday: 'long' }).format(d);
       
-      const formattedDate = `${weekday}، ${day} ${month} ${year}`;
+        const formattedDate = `${weekday}، ${day} ${month} ${year}`;
 
-      // Navigate to Success Receipt Page
-      navigate('/success', {
-          state: {
-              customerName,
-              formattedDate: formattedDate,
-              timeSlot: selectedTime,
-          }
-      });
+        // Navigate to Success Receipt Page
+        navigate('/success', {
+            state: {
+                customerName,
+                formattedDate: formattedDate,
+                timeSlot: selectedTime,
+            }
+        });
 
-    } catch (e) {
-      alert('خطا در ثبت نوبت');
-    } finally {
-      setLoading(false);
-    }
-  };
+      } catch (e) {
+        setFormError('خطا در ثبت نوبت. لطفا دوباره تلاش کنید.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
   if (loadingData) {
       return (
@@ -403,7 +405,7 @@ const BookingPage: React.FC = () => {
                     <input 
                         type="text" 
                         value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
+                                                onChange={(e) => { setCustomerName(e.target.value); setFormError(''); }}
                         className="w-full pr-10 pl-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
                         placeholder="مثال: علی محمدی"
                     />
@@ -414,7 +416,7 @@ const BookingPage: React.FC = () => {
                 <input 
                     type="tel" 
                     value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
+                                        onChange={(e) => { setCustomerPhone(e.target.value); setFormError(''); }}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
                     placeholder="0912..."
                     dir="ltr"
@@ -443,13 +445,17 @@ const BookingPage: React.FC = () => {
              </div>
         </div>
 
-        <button 
-            onClick={handleBooking}
-            disabled={loading}
-            className="w-full bg-white text-slate-950 py-4 rounded-xl font-bold shadow-lg hover:bg-slate-200 transition-all flex justify-center items-center gap-2"
-        >
-            {loading ? 'در حال ثبت...' : 'ثبت قطعی نوبت'}
-        </button>
+        {formError && (
+                    <p className="text-red-500 text-sm text-center bg-red-500/10 py-3 rounded-xl border border-red-500/20">{formError}</p>
+                )}
+
+                <button 
+                    onClick={handleBooking}
+                    disabled={loading}
+                    className="w-full bg-white text-slate-950 py-4 rounded-xl font-bold shadow-lg hover:bg-slate-200 transition-all flex justify-center items-center gap-2"
+                >
+                    {loading ? 'در حال ثبت...' : 'ثبت قطعی نوبت'}
+                </button>
     </div>
   );
 };

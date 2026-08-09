@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import { Booking, Service, ShopSettings } from '../../types';
 import { getBookings, getServices, saveService, deleteService, getShopSettings, saveShopSettings, cleanupOldBookings } from '../../services/dataService';
 import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw } from 'lucide-react';
@@ -19,6 +18,8 @@ const AdminDashboard: React.FC = () => {
   
   // Notification State
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  // Service pending deletion (confirm modal)
+  const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
 
   const navigate = useNavigate();
 
@@ -101,7 +102,9 @@ const AdminDashboard: React.FC = () => {
       };
   };
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
+    // Load xlsx on demand so it doesn't bloat the main bundle
+    const XLSX = await import('xlsx');
     const dataToExport = getDisplayedBookings();
     const data = dataToExport.map(b => {
       const { full } = getFormattedDateParts(b.date);
@@ -225,11 +228,16 @@ const AdminDashboard: React.FC = () => {
     setNotification({ type: 'success', message: 'خدمات با موفقیت به‌روزرسانی شد.' });
   };
 
-  const handleDeleteService = async (id: string) => {
-    if (confirm('آیا از حذف این خدمت اطمینان دارید؟')) {
-      await deleteService(id);
-      loadData();
-    }
+  const handleDeleteService = (service: Service) => {
+    setServiceToDelete(service);
+  };
+
+  const confirmDeleteService = async () => {
+    if (!serviceToDelete) return;
+    await deleteService(serviceToDelete.id);
+    setServiceToDelete(null);
+    loadData();
+    setNotification({ type: 'success', message: 'خدمت با موفقیت حذف شد.' });
   };
 
   const handleSaveSettings = async () => {
@@ -346,7 +354,46 @@ const AdminDashboard: React.FC = () => {
           </div>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            {/* Delete Service Confirm Modal */}
+            {serviceToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
+                        <button 
+                            onClick={() => setServiceToDelete(null)}
+                            className="absolute top-4 left-4 text-slate-500 hover:text-white transition-colors"
+                        >
+                            <X size={20} />
+                        </button>
+                  
+                        <div className="flex flex-col items-center text-center gap-4">
+                            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500/10 text-red-500">
+                                <Trash2 size={32} />
+                            </div>
+                            <h3 className="text-xl font-bold text-white">حذف خدمت</h3>
+                            <p className="text-slate-400">
+                                آیا از حذف «{serviceToDelete.title}» اطمینان دارید؟
+                            </p>
+                      
+                            <div className="flex gap-3 w-full">
+                                <button 
+                                    onClick={() => setServiceToDelete(null)}
+                                    className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all"
+                                >
+                                    انصراف
+                                </button>
+                                <button 
+                                    onClick={confirmDeleteService}
+                                    className="flex-1 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-all"
+                                >
+                                    حذف
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 className="text-3xl font-black text-white">داشبورد مدیریت استایلفلو</h2>
         <button onClick={logout} className="text-red-400 hover:text-red-300 text-sm font-medium border border-red-500/20 px-4 py-2 rounded-lg hover:bg-red-500/10 transition-colors">خروج از حساب</button>
       </div>
@@ -590,7 +637,7 @@ const AdminDashboard: React.FC = () => {
                            <button onClick={() => setEditingService(service)} className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-full transition-colors">
                                <Edit2 size={16} />
                            </button>
-                           <button onClick={() => handleDeleteService(service.id)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors">
+                           <button onClick={() => handleDeleteService(service)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors">
                                <Trash2 size={16} />
                            </button>
                        </div>

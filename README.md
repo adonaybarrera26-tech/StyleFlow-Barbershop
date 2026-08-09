@@ -52,15 +52,11 @@ A modern, bilingual (Persian/English) barbershop booking app built with React, T
 └── types.ts
 ```
 
-## ✍️ Credit & Usage Terms
+## 📄 License
 
-Designed and developed by **ErPyCode**.
+Licensed under the [MIT License](./LICENSE).
 
-You are free to use this project in your own projects, provided that:
-
-1. You credit the original developer (**ErPyCode**) in your Credits section or README file
-2. You do not remove the digital signatures present in the code or UI without permission
-3. If significant changes are made, please still link back to the original source
+Designed and developed by **ErPyCode** — a star on GitHub or a credit note is always appreciated. 💈
 
 ---
 
