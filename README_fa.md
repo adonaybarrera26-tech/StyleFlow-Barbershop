@@ -36,28 +36,6 @@
 
 > ⚠️ توجه — دیتا داخل مرورگر می‌ماند و هرگز به سروری ارسال نمی‌شود.
 
-## 📦 شروع سریع
-
-```bash
-git clone https://github.com/erpycode/StyleFlow-Barbershop.git
-cd StyleFlow-Barbershop
-npm install
-npm run dev
-```
-
-بیلد برای پروداکشن:
-
-```bash
-npm run build     # خروجی در dist/
-npm run preview   # پیش‌نمایش بیلد به صورت محلی
-```
-
-## ☁️ دیپلوی
-
-پروژه به صورت خودکار روی **GitHub Pages** دیپلوی می‌شود (فایل `.github/workflows/deploy.yml`) — هر پوش روی `main` سایت را بیلد و منتشر می‌کند.
-
-روش دستی: `npm run build` و آپلود پوشه `dist/` روی هر هاست استاتیک (Netlify ،Vercel ،Cloudflare Pages). چون ۱۰۰٪ استاتیک است، هیچ تنظیم سروری لازم نیست.
-
 ## 📁 ساختار پروژه
 
 ```

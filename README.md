@@ -36,28 +36,6 @@ A modern, bilingual (Persian/English) barbershop booking app built with React, T
 
 > ⚠️ Note — data lives in the browser and is never sent to a server.
 
-## 📦 Quick Start
-
-```bash
-git clone https://github.com/erpycode/StyleFlow-Barbershop.git
-cd StyleFlow-Barbershop
-npm install
-npm run dev
-```
-
-Build for production:
-
-```bash
-npm run build   # outputs to dist/
-npm run preview # preview the build locally
-```
-
-## ☁️ Deployment
-
-The project deploys to **GitHub Pages** automatically via GitHub Actions (see `.github/workflows/deploy.yml`) — every push to `main` builds and publishes the site.
-
-Manual alternative: `npm run build` and upload the `dist/` folder to any static host (Netlify, Vercel, Cloudflare Pages). No server-side configuration needed — it's 100% static.
-
 ## 📁 Project Structure
 
 ```
