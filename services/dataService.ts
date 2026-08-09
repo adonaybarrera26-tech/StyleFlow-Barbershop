@@ -78,7 +78,7 @@ export const createBooking = async (booking: Omit<Booking, 'id' | 'createdAt'>):
 };
 
 export const cleanupOldBookings = async (): Promise<void> => {
-  // در حالت دمو نیازی به پاکسازی نیست یا می‌توان پیاده‌سازی کرد
+  // TODO: نوبت‌های گذشته را می‌توان خودکار پاکسازی کرد
 };
 
 export const getShopSettings = async (): Promise<ShopSettings> => {

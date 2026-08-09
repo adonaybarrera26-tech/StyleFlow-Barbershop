@@ -32,8 +32,8 @@ const AboutProject: React.FC = () => {
           </div>
           <p className="text-slate-400 leading-relaxed">
             {language === 'fa' 
-              ? 'استایل‌فلو یک پروژه کامل و مدرن برای مدیریت نوبت‌دهی آرایشگاه است. این پروژه با هدف نمایش مهارت‌های توسعه فرانت‌اند و ادغام ابزارهای مدرن ساخته شده است.'
-              : 'StyleFlow is a complete and modern project for managing barbershop appointments. It was built to showcase frontend development skills and modern tool integration.'}
+              ? 'استایل‌فلو یک سیستم کامل و مدرن برای مدیریت نوبت‌دهی آرایشگاه است؛ از رزرو آنلاین مشتریان تا مدیریت خدمات، نوبت‌ها و گزارش‌گیری برای مدیر سالن.'
+              : 'StyleFlow is a complete and modern appointment management system for barbershops; from online booking to service management and reporting for the salon owner.'}
           </p>
           <ul className="space-y-3 text-sm text-slate-300">
             <li className="flex items-center gap-2">✓ {language === 'fa' ? 'پشتیبانی کامل از دو زبان و RTL' : 'Full Bilingual and RTL support'}</li>

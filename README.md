@@ -2,9 +2,9 @@
 
 **English** | [نسخه فارسی](./README_fa.md)
 
-A modern, bilingual (Persian/English) barbershop booking app built with React, TypeScript and Vite. Designed as a portfolio demo — fully offline-first with no backend required.
+A modern, bilingual (Persian/English) barbershop booking app built with React, TypeScript and Vite. Fully offline-first with no backend required.
 
-> **🌐 Live Demo:** https://erpycode.github.io/StyleFlow-Barbershop/
+> **🌐 Live:** https://erpycode.github.io/StyleFlow-Barbershop/
 
 ## ✨ Features
 
@@ -28,13 +28,13 @@ A modern, bilingual (Persian/English) barbershop booking app built with React, T
 | Export   | xlsx |
 | Storage  | LocalStorage |
 
-## 🔑 Demo Credentials
+## 🔑 Admin Credentials
 
 | Role  | Username | Password |
 |-------|----------|----------|
 | Admin | `admin`  | `admin`  |
 
-> ⚠️ Demo only — data lives in the browser and is never sent to a server.
+> ⚠️ Note — data lives in the browser and is never sent to a server.
 
 ## 📦 Quick Start
 
@@ -78,7 +78,7 @@ Manual alternative: `npm run build` and upload the `dist/` folder to any static 
 
 Designed and developed by **ErPyCode**.
 
-You are free to use this project in your portfolio or your own projects, provided that:
+You are free to use this project in your own projects, provided that:
 
 1. You credit the original developer (**ErPyCode**) in your Credits section or README file
 2. You do not remove the digital signatures present in the code or UI without permission
