@@ -58,6 +58,18 @@ export const isValidMexicanPhone = (phone: string): boolean => {
 export const buildWhatsAppLink = (message: string): string =>
   `https://wa.me/${SHOP_INFO.whatsappNumber}?text=${encodeURIComponent(message)}`;
 
+// Celular de un cliente en formato internacional para wa.me (México: 52 + 10 dígitos)
+export const toWhatsAppNumber = (phone: string): string => {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) return `52${digits}`;
+  if (digits.length === 13 && digits.startsWith('521')) return `52${digits.slice(3)}`;
+  return digits; // ya trae la lada (52...) o es de otro país
+};
+
+// Enlace para escribirle a un cliente por WhatsApp con un mensaje ya escrito
+export const buildCustomerWhatsAppLink = (phone: string, message: string): string =>
+  `https://wa.me/${toWhatsAppNumber(phone)}?text=${encodeURIComponent(message)}`;
+
 // Para insertar texto del usuario en HTML (ventana de impresión) sin riesgos
 export const escapeHtml = (text: string): string =>
   text
