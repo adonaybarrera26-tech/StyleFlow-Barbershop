@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Service, Booking, ShopSettings } from '../../types';
-import { getServices, createBooking, getBookings, getShopSettings } from '../../services/dataService';
+import { getServices, createBooking, getTakenSlots, getShopSettings } from '../../services/dataService';
 import { DEFAULT_SETTINGS } from '../../constants';
 import { formatMXN, formatDateLong, formatDateShort, formatTime, isValidMexicanPhone } from '../../services/format';
 import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, Loader2 } from 'lucide-react';
@@ -23,26 +23,31 @@ const BookingPage: React.FC = () => {
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [shopSettings, setShopSettings] = useState<ShopSettings>(DEFAULT_SETTINGS);
   const [loadingData, setLoadingData] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isDayOff, setIsDayOff] = useState(false);
 
+  const initData = async () => {
+      setLoadingData(true);
+      setLoadError(false);
+      try {
+          // Solo se piden los horarios ocupados (sin nombres ni celulares de otros clientes)
+          const [fetchedServices, fetchedBookings, fetchedSettings] = await Promise.all([
+              getServices(),
+              getTakenSlots(),
+              getShopSettings()
+          ]);
+          setServices(fetchedServices);
+          setAllBookings(fetchedBookings);
+          setShopSettings(fetchedSettings);
+      } catch (error) {
+          console.error("Error al cargar los datos iniciales", error);
+          setLoadError(true);
+      } finally {
+          setLoadingData(false);
+      }
+  };
+
   useEffect(() => {
-    const initData = async () => {
-        setLoadingData(true);
-        try {
-            const [fetchedServices, fetchedBookings, fetchedSettings] = await Promise.all([
-                getServices(),
-                getBookings(),
-                getShopSettings()
-            ]);
-            setServices(fetchedServices);
-            setAllBookings(fetchedBookings);
-            setShopSettings(fetchedSettings);
-        } catch (error) {
-            console.error("Error al cargar los datos iniciales", error);
-        } finally {
-            setLoadingData(false);
-        }
-    };
     initData();
   }, []);
 
@@ -128,9 +133,15 @@ const BookingPage: React.FC = () => {
     // Un horario está ocupado si se cruza con alguna cita
     // (inicio de la cita -> inicio + duración total). Así se evitan citas dobles
     // aunque un servicio dure más de un horario.
+    // La duración de lo que el cliente eligió también cuenta: un servicio de 2 horas
+    // no debe caber en un hueco de 30 minutos.
+    const neededMinutes = Math.max(
+        selectedServices.reduce((sum, s) => sum + s.durationMinutes, 0),
+        shopSettings.slotInterval
+    );
     const isSlotTaken = (slot: string) => {
         const slotStart = toMinutes(slot);
-        const slotEnd = slotStart + shopSettings.slotInterval;
+        const slotEnd = slotStart + neededMinutes;
         return dayBookings.some(b => {
             const bookingStart = toMinutes(b.timeSlot);
             const bookingEnd = bookingStart + (b.totalDuration || shopSettings.slotInterval);
@@ -160,7 +171,7 @@ const BookingPage: React.FC = () => {
     if (selectedTime && (!free.includes(selectedTime))) {
         setSelectedTime('');
     }
-  }, [selectedDate, allBookings, selectedTime, shopSettings, loadingData]);
+  }, [selectedDate, allBookings, selectedTime, shopSettings, loadingData, selectedServices]);
 
 
   const toggleService = (service: Service) => {
@@ -208,11 +219,42 @@ const BookingPage: React.FC = () => {
         });
 
       } catch (e) {
-        setFormError('No pudimos guardar tu cita. Intenta de nuevo.');
+        const code = e instanceof Error ? e.message : '';
+        if (code === 'slot_taken' || code === 'past_date' || code === 'day_off' || code === 'invalid_time') {
+          // Alguien más tomó ese horario (o ya no está disponible): se actualiza la lista y se vuelve a elegir
+          try {
+            setAllBookings(await getTakenSlots());
+          } catch (refreshError) {
+            console.error('No se pudieron actualizar los horarios', refreshError);
+          }
+          setSelectedTime('');
+          setStep(2);
+          setFormError('Ese horario ya se ocupó. Elige otro, por favor.');
+        } else if (code === 'invalid_phone') {
+          setFormError('Escribe un número de celular válido de 10 dígitos.');
+        } else if (code === 'invalid_name') {
+          setFormError('Escribe tu nombre.');
+        } else {
+          setFormError('No pudimos guardar tu cita. Revisa tu internet e intenta de nuevo.');
+        }
       } finally {
         setLoading(false);
       }
     };
+
+  if (loadError) {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center gap-4 px-6">
+              <p className="text-slate-300">No pudimos cargar la información. Revisa tu internet e intenta de nuevo.</p>
+              <button
+                  onClick={initData}
+                  className="sticker bg-amber-500 text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400"
+              >
+                  Reintentar
+              </button>
+          </div>
+      );
+  }
 
   if (loadingData) {
       return (
@@ -317,7 +359,7 @@ const BookingPage: React.FC = () => {
                          return (
                              <button
                                 key={date.toISOString()}
-                                onClick={() => setSelectedDate(date)}
+                                onClick={() => { setSelectedDate(date); setFormError(''); }}
                                 className={`flex-shrink-0 w-24 h-32 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${
                                     isSelected
                                     ? 'bg-amber-500 text-black border-amber-500 shadow-[4px_4px_0_0_#F1E8D0] -translate-y-1'
@@ -338,6 +380,10 @@ const BookingPage: React.FC = () => {
                     <Clock size={18} className="text-amber-500" /> Horarios disponibles
                 </h3>
 
+                {formError && (
+                    <p className="text-red-500 text-sm text-center bg-red-500/10 py-3 rounded-xl border border-red-500/20">{formError}</p>
+                )}
+
                 {isDayOff ? (
                     <div className="p-12 text-center border-2 border-dashed border-red-500/30 rounded-2xl text-red-400 bg-red-500/5 flex flex-col items-center gap-3">
                         <Ban size={32} />
@@ -353,7 +399,7 @@ const BookingPage: React.FC = () => {
                         {availableSlots.map(time => (
                             <button
                                 key={time}
-                                onClick={() => setSelectedTime(time)}
+                                onClick={() => { setSelectedTime(time); setFormError(''); }}
                                 className={`py-3 px-2 rounded-xl text-sm font-medium border transition-all ${
                                     selectedTime === time
                                     ? 'bg-white text-slate-900 border-white font-bold shadow-lg'
@@ -387,7 +433,7 @@ const BookingPage: React.FC = () => {
   // --- Paso 3: datos y confirmación ---
   return (
     <div className="space-y-6 pb-24 animate-in slide-in-from-right-4">
-        <button onClick={() => setStep(2)} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
+        <button onClick={() => { setFormError(''); setStep(2); }} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
             <ChevronLeft size={16} /> Atrás
         </button>
 

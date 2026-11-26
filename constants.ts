@@ -37,3 +37,11 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   offDays: [0], // Domingo (en JavaScript getDay(): 0 = domingo, 1 = lunes ... 6 = sábado)
   slotInterval: 30
 };
+
+// Base de datos en línea (Supabase).
+// Si se dejan vacíos, la app funciona en "modo demo": guarda todo solo en el navegador.
+// La llave pública (anon / publishable) es segura de publicar: la protegen las reglas de supabase/schema.sql.
+export const SUPABASE_CONFIG = {
+  url: '',     // Ejemplo: https://abcdefghijklmno.supabase.co
+  anonKey: ''  // Llave pública (anon o publishable)
+};

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Booking, Service, ShopSettings } from '../../types';
-import { getBookings, getServices, saveService, deleteService, getShopSettings, saveShopSettings, cleanupOldBookings } from '../../services/dataService';
+import { getBookings, getServices, saveService, deleteService, deleteBooking, getShopSettings, saveShopSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin } from '../../services/dataService';
 import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw } from 'lucide-react';
 import { DEFAULT_SETTINGS, SHOP_INFO } from '../../constants';
 import { formatMXN, formatTime, formatDateTimeShort, getDateParts, escapeHtml } from '../../services/format';
+import AdminSummary from './AdminSummary';
 
 const AdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'bookings' | 'services' | 'settings'>('bookings');
+  const [activeTab, setActiveTab] = useState<'summary' | 'bookings' | 'services' | 'settings'>('summary');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [settings, setSettings] = useState<ShopSettings>(DEFAULT_SETTINGS);
@@ -21,16 +22,24 @@ const AdminDashboard: React.FC = () => {
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   // Servicio pendiente de eliminar (ventana de confirmación)
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
+  // Cita pendiente de cancelar (ventana de confirmación)
+  const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    const isAuth = sessionStorage.getItem('isAdmin');
-    if (!isAuth) {
-      navigate('/admin/login');
-      return;
-    }
-    loadData();
+    let cancelled = false;
+    const checkAccess = async () => {
+      const isAuth = await isAdminLoggedIn();
+      if (cancelled) return;
+      if (!isAuth) {
+        navigate('/admin/login');
+        return;
+      }
+      loadData();
+    };
+    checkAccess();
+    return () => { cancelled = true; };
   }, [navigate]);
 
   // Actualización automática cada 5 minutos (300000 ms) si está activada
@@ -84,9 +93,19 @@ const AdminDashboard: React.FC = () => {
         setSettings(config);
     } catch (error) {
         console.error("No se pudieron cargar los datos", error);
+        handleActionError(error, 'No se pudieron cargar los datos. Revisa tu internet e intenta de nuevo.', silent);
     } finally {
         if (!silent) setIsRefreshing(false);
     }
+  };
+
+  // Si la sesión venció, se regresa al acceso; si no, se muestra un aviso
+  const handleActionError = (error: unknown, message: string, silent = false) => {
+    if (error instanceof Error && error.message === 'session_expired') {
+      navigate('/admin/login');
+      return;
+    }
+    if (!silent) setNotification({ type: 'error', message });
   };
 
   // Fecha en partes: día de la semana y "26 de noviembre de 2026"
@@ -212,10 +231,14 @@ const AdminDashboard: React.FC = () => {
       description: editingService.description || ''
     };
 
-    await saveService(newService);
-    setEditingService(null);
-    loadData();
-    setNotification({ type: 'success', message: 'Servicio guardado correctamente.' });
+    try {
+      await saveService(newService);
+      setEditingService(null);
+      loadData(true);
+      setNotification({ type: 'success', message: 'Servicio guardado correctamente.' });
+    } catch (e) {
+      handleActionError(e, 'No se pudo guardar el servicio. Intenta de nuevo.');
+    }
   };
 
   const handleDeleteService = (service: Service) => {
@@ -224,10 +247,28 @@ const AdminDashboard: React.FC = () => {
 
   const confirmDeleteService = async () => {
     if (!serviceToDelete) return;
-    await deleteService(serviceToDelete.id);
-    setServiceToDelete(null);
-    loadData();
-    setNotification({ type: 'success', message: 'Servicio eliminado correctamente.' });
+    try {
+      await deleteService(serviceToDelete.id);
+      setServiceToDelete(null);
+      loadData(true);
+      setNotification({ type: 'success', message: 'Servicio eliminado correctamente.' });
+    } catch (e) {
+      setServiceToDelete(null);
+      handleActionError(e, 'No se pudo eliminar el servicio. Intenta de nuevo.');
+    }
+  };
+
+  const confirmDeleteBooking = async () => {
+    if (!bookingToDelete) return;
+    try {
+      await deleteBooking(bookingToDelete.id);
+      setBookingToDelete(null);
+      loadData(true);
+      setNotification({ type: 'success', message: 'La cita se canceló correctamente.' });
+    } catch (e) {
+      setBookingToDelete(null);
+      handleActionError(e, 'No se pudo cancelar la cita. Intenta de nuevo.');
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -236,7 +277,7 @@ const AdminDashboard: React.FC = () => {
       await saveShopSettings(settings);
       setNotification({ type: 'success', message: 'Configuración guardada correctamente.' });
     } catch (e) {
-      setNotification({ type: 'error', message: 'No se pudo guardar la configuración. Intenta de nuevo.' });
+      handleActionError(e, 'No se pudo guardar la configuración. Intenta de nuevo.');
     } finally {
       setSavingSettings(false);
     }
@@ -251,8 +292,8 @@ const AdminDashboard: React.FC = () => {
       }
   };
 
-  const logout = () => {
-      sessionStorage.removeItem('isAdmin');
+  const logout = async () => {
+      await logoutAdmin();
       navigate('/admin/login');
   }
 
@@ -384,12 +425,59 @@ const AdminDashboard: React.FC = () => {
           </div>
       )}
 
+      {/* Ventana para confirmar la cancelación de una cita */}
+      {bookingToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
+                  <button
+                      onClick={() => setBookingToDelete(null)}
+                      aria-label="Cerrar"
+                      className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
+                  >
+                      <X size={20} />
+                  </button>
+
+                  <div className="flex flex-col items-center text-center gap-4">
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500/10 text-red-500">
+                          <Trash2 size={32} />
+                      </div>
+                      <h3 className="text-xl font-bold text-white">Cancelar cita</h3>
+                      <p className="text-slate-400">
+                          ¿Cancelar la cita de {bookingToDelete.customerName} el {getFormattedDateParts(bookingToDelete.date).full} a las {formatTime(bookingToDelete.timeSlot)}? El horario quedará libre. Avísale al cliente por WhatsApp.
+                      </p>
+
+                      <div className="flex gap-3 w-full">
+                          <button
+                              onClick={() => setBookingToDelete(null)}
+                              className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all"
+                          >
+                              Conservar
+                          </button>
+                          <button
+                              onClick={confirmDeleteBooking}
+                              className="flex-1 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-all"
+                          >
+                              Cancelar cita
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <h2 className="text-3xl font-black text-white">Panel de administración</h2>
         <button onClick={logout} className="text-red-400 hover:text-red-300 text-sm font-medium border border-red-500/20 px-4 py-2 rounded-lg hover:bg-red-500/10 transition-colors">Cerrar sesión</button>
       </div>
 
       <div className="flex gap-4 border-b border-slate-800 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('summary')}
+          className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'summary' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          Resumen
+          {activeTab === 'summary' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
+        </button>
         <button
           onClick={() => setActiveTab('bookings')}
           className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'bookings' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
@@ -412,6 +500,10 @@ const AdminDashboard: React.FC = () => {
           {activeTab === 'settings' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
         </button>
       </div>
+
+      {activeTab === 'summary' && (
+        <AdminSummary bookings={bookings} onOpenBookings={() => setActiveTab('bookings')} />
+      )}
 
       {activeTab === 'bookings' && (
         <div className="space-y-6 animate-in fade-in">
@@ -526,6 +618,7 @@ const AdminDashboard: React.FC = () => {
                                     <th className="p-4">Cliente</th>
                                     <th className="p-4">Servicios</th>
                                     <th className="p-4">Total</th>
+                                    <th className="p-4 w-16"><span className="sr-only">Acciones</span></th>
                                 </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800">
@@ -551,6 +644,16 @@ const AdminDashboard: React.FC = () => {
                                     </td>
                                     <td className="p-4 font-bold text-white">
                                         {formatMXN(booking.totalPrice)}
+                                    </td>
+                                    <td className="p-4">
+                                        <button
+                                            onClick={() => setBookingToDelete(booking)}
+                                            aria-label={`Cancelar la cita de ${booking.customerName}`}
+                                            title="Cancelar cita"
+                                            className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
                                     </td>
                                     </tr>
                                 ))}
