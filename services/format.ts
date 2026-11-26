@@ -54,6 +54,9 @@ export const isValidMexicanPhone = (phone: string): boolean => {
   return false;
 };
 
+// Últimos 10 dígitos de un celular: así "55 1234 5678", "+52 55 1234 5678" y "521 55 1234 5678" son el mismo número
+export const lastTenDigits = (phone: string): string => phone.replace(/\D/g, '').slice(-10);
+
 // Enlace para abrir WhatsApp con un mensaje ya escrito
 export const buildWhatsAppLink = (message: string): string =>
   `https://wa.me/${SHOP_INFO.whatsappNumber}?text=${encodeURIComponent(message)}`;

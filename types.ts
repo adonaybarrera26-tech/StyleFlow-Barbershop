@@ -18,6 +18,16 @@ export interface Booking {
   createdAt: string;
 }
 
+// Cita vista por el propio cliente en "Mis reservas": sin nombre ni teléfono
+export interface MyBooking {
+  id: string;
+  date: string; // fecha local a las 12:00 (ISO sin zona)
+  timeSlot: string; // "14:00"
+  services: Service[];
+  totalPrice: number;
+  totalDuration: number;
+}
+
 export enum UserRole {
   GUEST = 'GUEST',
   ADMIN = 'ADMIN'

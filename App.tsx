@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Home from './pages/Home';
 import BookingPage from './pages/user/BookingPage';
 import SuccessPage from './pages/user/SuccessPage';
+import MyBookingsPage from './pages/user/MyBookingsPage';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AboutProject from './pages/AboutProject';
@@ -18,6 +19,7 @@ const App: React.FC = () => {
             <Route path="/" element={<Home />} />
             <Route path="/booking" element={<BookingPage />} />
             <Route path="/success" element={<SuccessPage />} />
+            <Route path="/mis-reservas" element={<MyBookingsPage />} />
             <Route path="/about" element={<AboutProject />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />

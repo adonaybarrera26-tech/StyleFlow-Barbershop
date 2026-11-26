@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle2, MapPin, Calendar, Clock, Home, Navigation, MessageCircle } from 'lucide-react';
 import { Booking } from '../../types';
 import { SHOP_INFO } from '../../constants';
@@ -136,6 +136,10 @@ const SuccessPage: React.FC = () => {
                     Inicio
                 </button>
             </div>
+
+            <p className="text-slate-500 text-xs">
+                ¿Necesitas cancelar? Entra a <Link to="/mis-reservas" className="text-amber-500 underline">Mis reservas</Link> con tu celular.
+            </p>
         </div>
 
         {/* Círculos decorativos del boleto */}
