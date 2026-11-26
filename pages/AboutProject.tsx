@@ -1,105 +1,94 @@
 import React from 'react';
-import { useLanguage } from '../services/LanguageContext';
-import { Github, Linkedin, Mail, ExternalLink, Code2, Database, Layout } from 'lucide-react';
+import { MessageCircle, MapPin, CalendarCheck, Phone } from 'lucide-react';
 import { motion } from 'motion/react';
+import { SHOP_INFO } from '../constants';
+import { buildWhatsAppLink } from '../services/format';
 
 const AboutProject: React.FC = () => {
-  const { t, language, isRtl } = useLanguage();
-
   return (
     <div className="max-w-4xl mx-auto space-y-12 py-8 px-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="text-center space-y-4"
       >
-        <h1 className="text-4xl font-black text-white">StyleFlow Barbershop</h1>
+        <h1 className="text-4xl font-black text-white">{SHOP_INFO.name}</h1>
         <p className="text-amber-500 font-bold tracking-widest text-xs uppercase bg-amber-500/10 px-4 py-1 rounded-full inline-block">
-          {language === 'fa' ? 'اثر هنری مدرن از' : 'A Modern Digital Craft by'} @ErPyCode
+          Sistema de citas en línea
         </p>
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <motion.div 
-          initial={{ opacity: 0, x: isRtl ? 20 : -20 }}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
           className="bg-slate-900/50 p-8 rounded-3xl border border-slate-800 space-y-6"
         >
           <div className="flex items-center gap-4 text-white">
-            <Layout className="text-amber-500" />
-            <h2 className="text-xl font-bold">{language === 'fa' ? 'درباره پروژه' : 'About Project'}</h2>
+            <CalendarCheck className="text-amber-500" />
+            <h2 className="text-xl font-bold">¿Cómo funciona?</h2>
           </div>
           <p className="text-slate-400 leading-relaxed">
-            {language === 'fa' 
-              ? 'استایل‌فلو یک سیستم کامل و مدرن برای مدیریت نوبت‌دهی آرایشگاه است؛ از رزرو آنلاین مشتریان تا مدیریت خدمات، نوبت‌ها و گزارش‌گیری برای مدیر سالن.'
-              : 'StyleFlow is a complete and modern appointment management system for barbershops; from online booking to service management and reporting for the salon owner.'}
+            Tus clientes reservan desde el celular en tres pasos: eligen su servicio, su fecha y su hora. Tú ves y administras todas las citas desde el panel.
           </p>
           <ul className="space-y-3 text-sm text-slate-300">
-            <li className="flex items-center gap-2">✓ {language === 'fa' ? 'پشتیبانی کامل از دو زبان و RTL' : 'Full Bilingual and RTL support'}</li>
-            <li className="flex items-center gap-2">✓ {language === 'fa' ? 'سیستم مدیریت نوبت‌ها' : 'Appointment Management System'}</li>
-            <li className="flex items-center gap-2">✓ {language === 'fa' ? 'ذخیره‌سازی آفلاین در مرورگر' : 'Offline-First LocalStorage'}</li>
-            <li className="flex items-center gap-2">✓ {language === 'fa' ? 'طراحی ریسپانسیو و Dark Mode' : 'Responsive Design & Dark Mode'}</li>
+            <li className="flex items-center gap-2">✓ Reservas en línea las 24 horas</li>
+            <li className="flex items-center gap-2">✓ Panel para administrar citas y servicios</li>
+            <li className="flex items-center gap-2">✓ Precios en pesos mexicanos</li>
+            <li className="flex items-center gap-2">✓ Confirmación por WhatsApp</li>
+            <li className="flex items-center gap-2">✓ Exporta tus citas a Excel o imprímelas</li>
           </ul>
         </motion.div>
 
-        <motion.div 
-          initial={{ opacity: 0, x: isRtl ? -20 : 20 }}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
           className="bg-slate-900/50 p-8 rounded-3xl border border-slate-800 space-y-6"
         >
           <div className="flex items-center gap-4 text-white">
-            <Code2 className="text-amber-500" />
-            <h2 className="text-xl font-bold">{language === 'fa' ? 'تکنولوژی‌ها' : 'Tech Stack'}</h2>
+            <MapPin className="text-amber-500" />
+            <h2 className="text-xl font-bold">Ubicación y contacto</h2>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {['React', 'TypeScript', 'Tailwind CSS', 'Motion', 'Lucide Icons', 'LocalStorage'].map(tech => (
-              <span key={tech} className="px-3 py-1 bg-slate-800 text-slate-300 rounded-full text-xs border border-slate-700">
-                {tech}
-              </span>
-            ))}
-          </div>
-          <div className="pt-4 space-y-4">
-             <div className="flex items-center gap-3 text-slate-300">
-                <Database size={18} className="text-amber-500" />
-                <span className="text-sm">{language === 'fa' ? 'قابلیت اتصال به دیتابیس هوشمند' : 'Ready for Cloud Database'}</span>
-             </div>
+          <div className="space-y-4 text-slate-300">
+            <div className="flex items-start gap-3">
+              <MapPin size={18} className="text-amber-500 mt-0.5 shrink-0" />
+              <span className="text-sm leading-relaxed">{SHOP_INFO.address}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Phone size={18} className="text-amber-500 shrink-0" />
+              <span className="text-sm">{SHOP_INFO.displayPhone}</span>
+            </div>
           </div>
         </motion.div>
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.3 }}
         className="bg-amber-500/10 border border-amber-500/20 p-8 rounded-3xl text-center space-y-6"
       >
-        <h2 className="text-2xl font-bold text-white">{language === 'fa' ? 'ارتباط با من' : 'Connect with Me'}</h2>
-        <div className="flex justify-center flex-wrap gap-4">
-          <a href="https://github.com/ErPyCode" target="_blank" rel="noreferrer" className="flex items-center gap-2 px-5 py-3 bg-slate-900 rounded-2xl text-slate-300 hover:text-white transition-all hover:scale-105 border border-slate-800">
-            <Github size={20} />
-            <span className="text-sm font-medium">GitHub</span>
-          </a>
-          <a href="https://instagram.com/ErPyCode" target="_blank" rel="noreferrer" className="flex items-center gap-2 px-5 py-3 bg-slate-900 rounded-2xl text-slate-300 hover:text-white transition-all hover:scale-105 border border-slate-800">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
-            <span className="text-sm font-medium">Instagram</span>
-          </a>
-          <a href="https://t.me/ErPyCode" target="_blank" rel="noreferrer" className="flex items-center gap-2 px-5 py-3 bg-slate-900 rounded-2xl text-slate-300 hover:text-white transition-all hover:scale-105 border border-slate-800">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-            <span className="text-sm font-medium">Telegram</span>
-          </a>
-          <a href="mailto:ErPyCode@gmail.com" className="flex items-center gap-2 px-5 py-3 bg-slate-900 rounded-2xl text-slate-300 hover:text-white transition-all hover:scale-105 border border-slate-800">
-            <Mail size={20} />
-            <span className="text-sm font-medium">Email</span>
-          </a>
-        </div>
-        <p className="text-slate-400 text-sm">
-          {language === 'fa' 
-            ? 'اگر از این پروژه خوشتان آمد، با ستاره دادن در گیت‌هاب حمایت کنید.'
-            : 'If you like this project, support it by giving a star on GitHub.'}
-        </p>
+        <h2 className="text-2xl font-bold text-white">¿Tienes dudas?</h2>
+        <a
+          href={buildWhatsAppLink('Hola, me gustaría tener más información sobre sus servicios.')}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold transition-colors shadow-lg shadow-green-900/20"
+        >
+          <MessageCircle size={20} />
+          Escríbenos por WhatsApp
+        </a>
       </motion.div>
+
+      <p className="text-center text-xs text-slate-600">
+        Basado en{' '}
+        <a href="https://github.com/erpycode/StyleFlow-Barbershop" target="_blank" rel="noreferrer" className="underline hover:text-slate-400">
+          StyleFlow Barbershop
+        </a>{' '}
+        de ErPyCode · Licencia MIT
+      </p>
     </div>
   );
 };

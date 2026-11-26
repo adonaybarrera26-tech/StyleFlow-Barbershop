@@ -1,14 +1,14 @@
 import { Booking, Service, ShopSettings } from '../types';
-import { INITIAL_SERVICES, DEFAULT_SETTINGS } from '../constants';
+import { INITIAL_SERVICES, DEFAULT_SETTINGS, ADMIN_CREDENTIALS } from '../constants';
 
-// کلیدهای ذخیره‌سازی در مرورگر
+// Claves de almacenamiento en el navegador
 const STORAGE_KEYS = {
   SERVICES: 'styleflow_services',
   BOOKINGS: 'styleflow_bookings',
   SETTINGS: 'styleflow_settings'
 };
 
-// تابع کمکی برای خواندن از LocalStorage
+// Función auxiliar para leer de LocalStorage
 const getFromStorage = <T>(key: string, defaultValue: T): T => {
   const stored = localStorage.getItem(key);
   if (!stored) return defaultValue;
@@ -19,13 +19,13 @@ const getFromStorage = <T>(key: string, defaultValue: T): T => {
   }
 };
 
-// تابع کمکی برای نوشتن در LocalStorage
+// Función auxiliar para escribir en LocalStorage
 const saveToStorage = (key: string, data: any): void => {
   localStorage.setItem(key, JSON.stringify(data));
 };
 
 export const loginAdmin = async (username: string, password: string): Promise<boolean> => {
-  if (username === 'admin' && password === 'admin') {
+  if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
       sessionStorage.setItem('isAdmin', 'true');
       return true;
   }
@@ -39,13 +39,13 @@ export const getServices = async (): Promise<Service[]> => {
 export const saveService = async (service: Service): Promise<void> => {
   const services = await getServices();
   const index = services.findIndex(s => s.id === service.id);
-  
+
   if (index >= 0) {
     services[index] = service;
   } else {
     services.push(service);
   }
-  
+
   saveToStorage(STORAGE_KEYS.SERVICES, services);
 };
 
@@ -57,7 +57,7 @@ export const deleteService = async (id: string): Promise<void> => {
 
 export const getBookings = async (): Promise<Booking[]> => {
   const bookings = getFromStorage<Booking[]>(STORAGE_KEYS.BOOKINGS, []);
-  // مرتب‌سازی بر اساس جدیدترین
+  // Ordenar de la más reciente a la más antigua
   return bookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 };
 
@@ -65,20 +65,20 @@ export const createBooking = async (booking: Omit<Booking, 'id' | 'createdAt'>):
   const bookings = await getBookings();
   const id = Math.random().toString(36).substr(2, 9);
   const createdAt = new Date().toISOString();
-  
+
   const newBooking: Booking = {
     ...booking,
     id,
     createdAt
   };
-  
+
   bookings.push(newBooking);
   saveToStorage(STORAGE_KEYS.BOOKINGS, bookings);
   return id;
 };
 
 export const cleanupOldBookings = async (): Promise<void> => {
-  // TODO: نوبت‌های گذشته را می‌توان خودکار پاکسازی کرد
+  // Pendiente: las citas pasadas podrían borrarse automáticamente
 };
 
 export const getShopSettings = async (): Promise<ShopSettings> => {
