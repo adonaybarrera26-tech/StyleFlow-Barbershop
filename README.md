@@ -26,7 +26,19 @@ Todo lo importante está en [`constants.ts`](./constants.ts):
 
 Usuario inicial del panel: `admin`. Cambia la contraseña antes de compartir la app.
 
-> ⚠️ Al ser una app sin servidor, la contraseña del panel es solo una barrera básica para demostraciones. Para un negocio real hace falta una base de datos y un acceso seguro.
+> ⚠️ En **modo demo** (sin base de datos) cada celular guarda sus propias citas y la contraseña del panel es solo una barrera básica. Para un negocio real activa la base de datos en línea (siguiente sección).
+
+## 🗄️ Base de datos en línea (Supabase, gratis)
+
+Con la base de datos activada, **todas las citas se guardan en un solo lugar**: el dueño las ve desde cualquier celular y los clientes solo ven qué horarios están ocupados (nunca nombres ni teléfonos de otras personas).
+
+1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
+2. En **SQL Editor** pega y ejecuta el contenido de [`supabase/schema.sql`](./supabase/schema.sql). Crea las tablas, las reglas de seguridad y los servicios de ejemplo.
+3. En **Authentication → Users** crea el usuario del dueño (correo y contraseña) y luego ejecuta en el SQL Editor:
+   `insert into public.admins (email) values ('correo-del-dueno@ejemplo.com');`
+4. En **Project Settings → API** copia la **URL** y la llave **anon / publishable** y pégalas en `SUPABASE_CONFIG`, dentro de `constants.ts`. Esa llave es pública y es seguro publicarla: la protegen las reglas del paso 2.
+
+Con la base de datos activa, el panel de administración entra con **correo y contraseña** y tiene una pestaña **Resumen** con las citas de hoy, los ingresos del mes, el ticket promedio y gráficas. Si `SUPABASE_CONFIG` queda vacío, la app vuelve al modo demo.
 
 ## 🚀 Publicarla con GitHub Pages
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Loader2 } from 'lucide-react';
 import { loginAdmin } from '../../services/dataService';
+import { isSupabaseEnabled } from '../../services/supabase';
 
 const AdminLogin: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -20,10 +21,10 @@ const AdminLogin: React.FC = () => {
       if (success) {
         navigate('/admin/dashboard');
       } else {
-        setError('Usuario o contraseña incorrectos');
+        setError(isSupabaseEnabled() ? 'Correo o contraseña incorrectos.' : 'Usuario o contraseña incorrectos.');
       }
     } catch (err) {
-      setError('Ocurrió un error. Intenta de nuevo.');
+      setError('No pudimos conectarnos. Revisa tu internet e intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -41,12 +42,13 @@ const AdminLogin: React.FC = () => {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-2">Usuario</label>
+            <label className="block text-sm font-medium text-slate-400 mb-2">{isSupabaseEnabled() ? 'Correo' : 'Usuario'}</label>
             <input
-              type="text"
+              type={isSupabaseEnabled() ? 'email' : 'text'}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoCapitalize="none"
+              autoComplete={isSupabaseEnabled() ? 'email' : 'username'}
               className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
             />
           </div>
@@ -54,6 +56,7 @@ const AdminLogin: React.FC = () => {
             <label className="block text-sm font-medium text-slate-400 mb-2">Contraseña</label>
             <input
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
