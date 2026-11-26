@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Booking, Service, ShopSettings } from '../../types';
 import { getBookings, getServices, saveService, deleteService, deleteBooking, getShopSettings, saveShopSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin } from '../../services/dataService';
-import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw } from 'lucide-react';
+import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw, MessageCircle } from 'lucide-react';
 import { DEFAULT_SETTINGS, SHOP_INFO } from '../../constants';
-import { formatMXN, formatTime, formatDateTimeShort, getDateParts, escapeHtml } from '../../services/format';
+import { formatMXN, formatTime, formatDateTimeShort, getDateParts, escapeHtml, buildCustomerWhatsAppLink } from '../../services/format';
 import AdminSummary from './AdminSummary';
 
 const AdminDashboard: React.FC = () => {
@@ -24,6 +24,8 @@ const AdminDashboard: React.FC = () => {
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   // Cita pendiente de cancelar (ventana de confirmación)
   const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
+  // Cita recién cancelada (para ofrecer avisarle al cliente por WhatsApp)
+  const [cancelledBooking, setCancelledBooking] = useState<Booking | null>(null);
 
   const navigate = useNavigate();
 
@@ -258,13 +260,26 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  // Mensaje de WhatsApp para avisarle al cliente que su cita se canceló
+  const buildCancellationLink = (b: Booking): string => {
+    const { weekday, full } = getFormattedDateParts(b.date);
+    const firstName = b.customerName.trim().split(/\s+/)[0];
+    const services = b.selectedServices.map(s => s.title).join(', ');
+    const site = window.location.href.split('#')[0];
+    const message =
+      `Hola ${firstName}, te escribimos de ${SHOP_INFO.name}. ` +
+      `Tu cita del ${weekday.toLowerCase()} ${full} a las ${formatTime(b.timeSlot)} (${services}) se canceló. ` +
+      `Si quieres reagendar, puedes reservar otra aquí: ${site} ¡Gracias!`;
+    return buildCustomerWhatsAppLink(b.customerPhone, message);
+  };
+
   const confirmDeleteBooking = async () => {
     if (!bookingToDelete) return;
     try {
       await deleteBooking(bookingToDelete.id);
+      setCancelledBooking(bookingToDelete);
       setBookingToDelete(null);
       loadData(true);
-      setNotification({ type: 'success', message: 'La cita se canceló correctamente.' });
     } catch (e) {
       setBookingToDelete(null);
       handleActionError(e, 'No se pudo cancelar la cita. Intenta de nuevo.');
@@ -425,6 +440,48 @@ const AdminDashboard: React.FC = () => {
           </div>
       )}
 
+      {/* Aviso de cita cancelada, con botón para avisarle al cliente por WhatsApp */}
+      {cancelledBooking && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
+                  <button
+                      onClick={() => setCancelledBooking(null)}
+                      aria-label="Cerrar"
+                      className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
+                  >
+                      <X size={20} />
+                  </button>
+
+                  <div className="flex flex-col items-center text-center gap-4">
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center bg-green-500/10 text-green-500">
+                          <CheckCircle2 size={32} />
+                      </div>
+                      <h3 className="text-xl font-bold text-white">Cita cancelada</h3>
+                      <p className="text-slate-400">
+                          El horario de las {formatTime(cancelledBooking.timeSlot)} del {getFormattedDateParts(cancelledBooking.date).full} ya quedó libre. ¿Quieres avisarle a {cancelledBooking.customerName.trim().split(/\s+/)[0]} por WhatsApp?
+                      </p>
+
+                      <a
+                          href={buildCancellationLink(cancelledBooking)}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => setCancelledBooking(null)}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
+                      >
+                          <MessageCircle size={20} />
+                          Avisar por WhatsApp
+                      </a>
+                      <button
+                          onClick={() => setCancelledBooking(null)}
+                          className="w-full py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all"
+                      >
+                          Ahora no
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Ventana para confirmar la cancelación de una cita */}
       {bookingToDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -443,7 +500,7 @@ const AdminDashboard: React.FC = () => {
                       </div>
                       <h3 className="text-xl font-bold text-white">Cancelar cita</h3>
                       <p className="text-slate-400">
-                          ¿Cancelar la cita de {bookingToDelete.customerName} el {getFormattedDateParts(bookingToDelete.date).full} a las {formatTime(bookingToDelete.timeSlot)}? El horario quedará libre. Avísale al cliente por WhatsApp.
+                          ¿Cancelar la cita de {bookingToDelete.customerName} el {getFormattedDateParts(bookingToDelete.date).full} a las {formatTime(bookingToDelete.timeSlot)}? El horario quedará libre. Después podrás avisarle al cliente por WhatsApp.
                       </p>
 
                       <div className="flex gap-3 w-full">
