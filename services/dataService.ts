@@ -75,7 +75,8 @@ const mapSettings = (row: any): ShopSettings => ({
   breakStartTime: row.break_start,
   breakEndTime: row.break_end,
   offDays: row.off_days || [],
-  slotInterval: row.slot_interval
+  slotInterval: row.slot_interval,
+  maxBookingsPerPhone: row.max_bookings_per_phone ?? DEFAULT_SETTINGS.maxBookingsPerPhone
 });
 
 // Cambios (PATCH / DELETE): si no se modificó ninguna fila, algo falló (por ejemplo, falta de permisos)
@@ -251,6 +252,15 @@ export const createBooking = async (booking: Omit<Booking, 'id' | 'createdAt'>):
   }
 
   const bookings = await getBookings();
+
+  // Límite de citas próximas por celular (igual que en la base de datos)
+  const { maxBookingsPerPhone } = await getShopSettings();
+  const today = toDateString(new Date());
+  const upcoming = bookings.filter(
+    b => lastTenDigits(b.customerPhone) === lastTenDigits(booking.customerPhone) && toDateString(new Date(b.date)) >= today
+  ).length;
+  if (upcoming >= maxBookingsPerPhone) throw new Error('too_many_bookings');
+
   const id = Math.random().toString(36).substr(2, 9);
   const createdAt = new Date().toISOString();
 
@@ -343,7 +353,8 @@ export const getShopSettings = async (): Promise<ShopSettings> => {
     const rows = await supabaseRequest<any[]>('/rest/v1/settings?id=eq.1&select=*');
     return rows.length > 0 ? mapSettings(rows[0]) : DEFAULT_SETTINGS;
   }
-  return getFromStorage<ShopSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+  // Se mezcla con los valores por defecto por si lo guardado es de una versión anterior
+  return { ...DEFAULT_SETTINGS, ...getFromStorage<Partial<ShopSettings>>(STORAGE_KEYS.SETTINGS, {}) };
 };
 
 export const saveShopSettings = async (settings: ShopSettings): Promise<void> => {
@@ -354,7 +365,8 @@ export const saveShopSettings = async (settings: ShopSettings): Promise<void> =>
       break_start: settings.breakStartTime,
       break_end: settings.breakEndTime,
       off_days: settings.offDays,
-      slot_interval: settings.slotInterval
+      slot_interval: settings.slotInterval,
+      max_bookings_per_phone: settings.maxBookingsPerPhone
     });
     return;
   }

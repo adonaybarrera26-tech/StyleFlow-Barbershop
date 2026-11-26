@@ -10,6 +10,7 @@ Sistema de citas en línea para barbería, en español (México) y con precios e
 - **Confirmación por WhatsApp:** botón que abre WhatsApp con la cita ya escrita
 - **Mis reservas:** el cliente escribe su celular, ve sus próximas citas y puede cancelarlas (con botón para avisar a la barbería por WhatsApp). Con Supabase usa las funciones de la sección 8 de `supabase/schema.sql`; no muestra nombres ni teléfonos
 - **Panel de administración:** citas, servicios, horarios y días de descanso
+- **Límite de citas por celular:** por defecto 3 citas próximas por número, para que nadie bloquee la agenda. Se cambia en el panel, en Configuración → Citas por cliente. (Si ya tenías la base creada, vuelve a ejecutar `supabase/schema.sql`: es seguro repetirlo.)
 - **Exportar a Excel e imprimir** la agenda del día o de todas las citas
 - **Diseño oscuro** que funciona bien en celular y en computadora
 

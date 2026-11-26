@@ -92,7 +92,8 @@ const AdminDashboard: React.FC = () => {
 
         setBookings(sortedBookings);
         setServices(s);
-        setSettings(config);
+        // La actualización automática no toca la configuración: así no borra lo que se esté editando sin guardar
+        if (!silent) setSettings(config);
     } catch (error) {
         console.error("No se pudieron cargar los datos", error);
         handleActionError(error, 'No se pudieron cargar los datos. Revisa tu internet e intenta de nuevo.', silent);
@@ -898,6 +899,25 @@ const AdminDashboard: React.FC = () => {
                           </div>
                       ))}
                   </div>
+              </div>
+
+              {/* Límite de citas por celular */}
+              <div className="mt-8">
+                  <h3 className="font-bold text-white text-lg mb-2">Citas por cliente</h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                      Cuántas citas próximas puede tener un mismo celular. Evita que una persona aparte todos los horarios.
+                  </p>
+                  <label htmlFor="max-citas-por-celular" className="block text-slate-400 text-sm mb-2">Máximo de citas próximas por celular</label>
+                  <select
+                    id="max-citas-por-celular"
+                    value={settings.maxBookingsPerPhone}
+                    onChange={(e) => setSettings({...settings, maxBookingsPerPhone: Number(e.target.value)})}
+                    className="w-full md:w-48 p-3 bg-slate-950 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500"
+                  >
+                      {Array.from({length: 20}, (_, i) => i + 1).map(n => (
+                          <option key={n} value={n}>{n}</option>
+                      ))}
+                  </select>
               </div>
 
               {/* Botón de guardar */}

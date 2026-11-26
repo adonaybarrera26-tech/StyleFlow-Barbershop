@@ -31,8 +31,15 @@ create table if not exists public.settings (
   break_start text,
   break_end text,
   off_days integer[] not null default '{0}',   -- 0 = domingo ... 6 = sábado
-  slot_interval integer not null default 30 check (slot_interval between 5 and 240)
+  slot_interval integer not null default 30 check (slot_interval between 5 and 240),
+  -- Máximo de citas próximas por celular (se cambia desde el panel, en Configuración)
+  max_bookings_per_phone integer not null default 3 check (max_bookings_per_phone between 1 and 20)
 );
+
+-- Si la tabla ya existía de antes, agrega la columna nueva
+alter table public.settings
+  add column if not exists max_bookings_per_phone integer not null default 3
+  check (max_bookings_per_phone between 1 and 20);
 
 create table if not exists public.bookings (
   id uuid primary key default gen_random_uuid(),
@@ -163,6 +170,7 @@ declare
   v_services jsonb;
   v_set public.settings%rowtype;
   v_has_settings boolean;
+  v_active integer;
 begin
   -- Datos básicos
   if p_name is null or length(trim(p_name)) = 0 or length(p_name) > 120 then
@@ -231,6 +239,18 @@ begin
         raise exception 'invalid_time';
       end if;
     end if;
+  end if;
+
+  -- Límite de citas próximas por celular (un candado por celular para que dos reservas a la vez no lo rebasen)
+  perform pg_advisory_xact_lock(hashtext('phone:' || right(v_digits, 10)));
+
+  select count(*) into v_active
+  from public.bookings b
+  where right(regexp_replace(b.customer_phone, '\D', '', 'g'), 10) = right(v_digits, 10)
+    and b.booking_date >= (now() at time zone 'America/Mexico_City')::date;
+
+  if v_active >= (case when v_has_settings then v_set.max_bookings_per_phone else 3 end) then
+    raise exception 'too_many_bookings';
   end if;
 
   -- Una cita a la vez por día, para que dos personas no tomen el mismo horario
