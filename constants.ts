@@ -42,6 +42,6 @@ export const DEFAULT_SETTINGS: ShopSettings = {
 // Si se dejan vacíos, la app funciona en "modo demo": guarda todo solo en el navegador.
 // La llave pública (anon / publishable) es segura de publicar: la protegen las reglas de supabase/schema.sql.
 export const SUPABASE_CONFIG = {
-  url: '',     // Ejemplo: https://abcdefghijklmno.supabase.co
-  anonKey: ''  // Llave pública (anon o publishable)
+  url: 'https://hiyxtvjgcycltbmusfem.supabase.co',
+  anonKey: 'sb_publishable_CCzzeqXSqsGYiy9VZuanHA_yn62TZqY' // Llave pública (publishable)
 };

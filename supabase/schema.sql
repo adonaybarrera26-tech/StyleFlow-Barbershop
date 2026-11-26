@@ -112,7 +112,9 @@ drop policy if exists "bookings_delete" on public.bookings;
 create policy "bookings_delete" on public.bookings
   for delete to authenticated using (public.is_admin());
 
--- Permisos de tabla (las reglas de arriba deciden qué filas se ven)
+-- Permisos de tabla: primero se quitan todos y luego se dan solo los necesarios
+-- (las reglas de arriba deciden además qué filas se ven)
+revoke all on public.services, public.settings, public.bookings, public.admins from anon, authenticated;
 grant usage on schema public to anon, authenticated;
 grant select on public.services, public.settings to anon, authenticated;
 grant insert, update, delete on public.services to authenticated;
