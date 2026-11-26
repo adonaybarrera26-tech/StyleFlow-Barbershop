@@ -35,7 +35,8 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   breakStartTime: null,
   breakEndTime: null,
   offDays: [0], // Domingo (en JavaScript getDay(): 0 = domingo, 1 = lunes ... 6 = sábado)
-  slotInterval: 30
+  slotInterval: 30,
+  maxBookingsPerPhone: 3 // citas próximas que puede tener un mismo celular
 };
 
 // Base de datos en línea (Supabase).

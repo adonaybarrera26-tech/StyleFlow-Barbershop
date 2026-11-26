@@ -234,6 +234,12 @@ const BookingPage: React.FC = () => {
           setFormError('Escribe un número de celular válido de 10 dígitos.');
         } else if (code === 'invalid_name') {
           setFormError('Escribe tu nombre.');
+        } else if (code === 'too_many_bookings') {
+          const max = shopSettings.maxBookingsPerPhone;
+          setFormError(
+            `Ya tienes ${max === 1 ? '1 cita próxima' : `${max} citas próximas`} con este número, que es el máximo. ` +
+            'Cancela una en "Mis reservas" o espera a que pase.'
+          );
         } else {
           setFormError('No pudimos guardar tu cita. Revisa tu internet e intenta de nuevo.');
         }

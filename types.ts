@@ -45,4 +45,5 @@ export interface ShopSettings {
   breakEndTime: string | null;   // "14:00" or null
   offDays: number[]; // Array of day indexes (0=Sunday, 6=Saturday in JS? No, JS: 0=Sun, 6=Sat)
   slotInterval: number; // 30 minutes
+  maxBookingsPerPhone: number; // citas próximas permitidas por celular (3 por defecto)
 }
