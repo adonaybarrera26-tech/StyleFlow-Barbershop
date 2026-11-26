@@ -1,5 +1,6 @@
-import { Booking, Service, ShopSettings } from '../types';
+import { Booking, MyBooking, Service, ShopSettings } from '../types';
 import { INITIAL_SERVICES, DEFAULT_SETTINGS, ADMIN_CREDENTIALS } from '../constants';
+import { lastTenDigits } from './format';
 import { isSupabaseEnabled, supabaseRequest, signIn, signOut, getAccessToken, checkIsAdmin } from './supabase';
 
 // La app tiene dos modos:
@@ -272,6 +273,61 @@ export const deleteBooking = async (id: string): Promise<void> => {
 
   const bookings = await getBookings();
   saveToStorage(STORAGE_KEYS.BOOKINGS, bookings.filter(b => b.id !== id));
+};
+
+// ---------------------------------------------------------------
+// Mis reservas (el cliente ve y cancela sus propias citas con su celular)
+// ---------------------------------------------------------------
+
+// Citas de hoy en adelante de un celular. No incluye nombre ni teléfono.
+export const getMyBookings = async (phone: string): Promise<MyBooking[]> => {
+  if (isSupabaseEnabled()) {
+    const rows = await supabaseRequest<any[]>('/rest/v1/rpc/get_my_bookings', {
+      method: 'POST',
+      body: { p_phone: phone }
+    });
+    return rows.map(row => ({
+      id: row.id,
+      date: dateStringToIso(row.booking_date),
+      timeSlot: row.time_slot,
+      services: Array.isArray(row.services) ? row.services : [],
+      totalPrice: row.total_price,
+      totalDuration: row.total_duration
+    }));
+  }
+
+  // Modo demo: se busca en las citas guardadas en este navegador
+  if (lastTenDigits(phone).length < 10) throw new Error('invalid_phone');
+  const today = toDateString(new Date());
+  return getFromStorage<Booking[]>(STORAGE_KEYS.BOOKINGS, [])
+    .filter(b => lastTenDigits(b.customerPhone) === lastTenDigits(phone) && toDateString(new Date(b.date)) >= today)
+    .sort((a, b) => toDateString(new Date(a.date)).localeCompare(toDateString(new Date(b.date))) || a.timeSlot.localeCompare(b.timeSlot))
+    .map(b => ({
+      id: b.id,
+      date: dateStringToIso(toDateString(new Date(b.date))),
+      timeSlot: b.timeSlot,
+      services: b.selectedServices,
+      totalPrice: b.totalPrice,
+      totalDuration: b.totalDuration
+    }));
+};
+
+// Cancela una cita propia. Regresa true si se canceló y false si no se pudo
+// (celular distinto, cita ya pasada o ya cancelada).
+export const cancelMyBooking = async (id: string, phone: string): Promise<boolean> => {
+  if (isSupabaseEnabled()) {
+    const result = await supabaseRequest<boolean>('/rest/v1/rpc/cancel_my_booking', {
+      method: 'POST',
+      body: { p_booking_id: id, p_phone: phone }
+    });
+    return result === true;
+  }
+
+  const bookings = getFromStorage<Booking[]>(STORAGE_KEYS.BOOKINGS, []);
+  const remaining = bookings.filter(b => !(b.id === id && lastTenDigits(b.customerPhone) === lastTenDigits(phone)));
+  if (remaining.length === bookings.length) return false;
+  saveToStorage(STORAGE_KEYS.BOOKINGS, remaining);
+  return true;
 };
 
 export const cleanupOldBookings = async (): Promise<void> => {

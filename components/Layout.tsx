@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Lock, Home, Info, Scissors } from 'lucide-react';
+import { Calendar, ClipboardList, Lock, Home, Info, Scissors } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '../services/LanguageContext';
 
@@ -91,6 +91,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <nav className="p-4 space-y-2 flex-1">
             <NavItem to="/" icon={Home} label="Inicio" />
             <NavItem to="/booking" icon={Calendar} label="Reservar cita" />
+            <NavItem to="/mis-reservas" icon={ClipboardList} label="Mis reservas" />
             <NavItem to="/about" icon={Info} label={t('aboutUs')} />
             <div className="pt-4 mt-4 border-t-2 border-slate-800">
                <p className="px-4 text-xs text-slate-500 mb-2">Administración</p>
@@ -120,6 +121,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="flex justify-around items-center h-full px-2">
           <MobileNavItem to="/" icon={Home} label="Inicio" />
           <MobileNavItem to="/booking" icon={Calendar} label="Reservar" />
+          <MobileNavItem to="/mis-reservas" icon={ClipboardList} label="Mis citas" />
           <MobileNavItem to="/about" icon={Info} label="Info" />
           <MobileNavItem to="/admin" icon={Lock} label="Admin" />
         </div>
