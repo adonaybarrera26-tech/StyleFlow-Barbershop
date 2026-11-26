@@ -1,15 +1,32 @@
 import { Service, ShopSettings } from './types';
 
-export const INITIAL_SERVICES: Service[] = [
-  { id: '1', title: 'اصلاح موی سر', price: 150000, durationMinutes: 30, description: 'مدل‌های کلاسیک و مدرن' },
-  { id: '2', title: 'اصلاح صورت', price: 80000, durationMinutes: 20, description: 'با ماشین یا تیغ' },
-  { id: '3', title: 'پکیج داماد', price: 1500000, durationMinutes: 120, description: 'گریم، پاکسازی و اصلاح کامل' },
-  { id: '4', title: 'پاکسازی پوست', price: 300000, durationMinutes: 45, description: 'ماسک سیاه و بخور گرم' },
-];
+// ============================================================
+// DATOS DEL NEGOCIO — cambia aquí lo que quieras personalizar
+// ============================================================
+export const SHOP_INFO = {
+  name: 'StyleFlow Barbería',
+  tagline: 'Un corte, una barba y un estilo a tu medida, en un ambiente profesional',
+  // WhatsApp: lada del país + número, solo dígitos y sin espacios.
+  // México: 52 + 10 dígitos. (Número de ejemplo: cámbialo por el real)
+  whatsappNumber: '525512345678',
+  displayPhone: '55 1234 5678',
+  // Dirección de ejemplo: cámbiala por la real
+  address: 'Calle Ejemplo 123, Col. Centro, Ciudad de México',
+};
 
-export const PERSIAN_MONTHS = [
-  'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
-  'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'
+// Acceso al panel de administración (solo para demostración).
+// Nota: al ser una app sin servidor, esta contraseña viaja en el código de la página.
+export const ADMIN_CREDENTIALS = {
+  username: 'admin',
+  password: 'barberia2026',
+};
+
+// Precios en pesos mexicanos (MXN)
+export const INITIAL_SERVICES: Service[] = [
+  { id: '1', title: 'Corte de cabello', price: 150, durationMinutes: 30, description: 'Clásico o moderno, con máquina y tijera' },
+  { id: '2', title: 'Arreglo de barba', price: 100, durationMinutes: 20, description: 'Perfilado con navaja y toalla caliente' },
+  { id: '3', title: 'Paquete novio', price: 800, durationMinutes: 120, description: 'Corte, barba, limpieza facial y peinado' },
+  { id: '4', title: 'Limpieza facial', price: 250, durationMinutes: 45, description: 'Mascarilla negra y vapor caliente' },
 ];
 
 export const DEFAULT_SETTINGS: ShopSettings = {
@@ -17,6 +34,6 @@ export const DEFAULT_SETTINGS: ShopSettings = {
   workEndTime: '20:00',
   breakStartTime: null,
   breakEndTime: null,
-  offDays: [5], // Friday (In JS getDay(): 5 is Friday)
+  offDays: [0], // Domingo (en JavaScript getDay(): 0 = domingo, 1 = lunes ... 6 = sábado)
   slotInterval: 30
 };

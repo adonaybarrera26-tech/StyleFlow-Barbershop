@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Service, Booking, ShopSettings } from '../../types';
 import { getServices, createBooking, getBookings, getShopSettings } from '../../services/dataService';
-import { PERSIAN_MONTHS, DEFAULT_SETTINGS } from '../../constants';
-import { Check, Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, Loader2 } from 'lucide-react';
+import { DEFAULT_SETTINGS } from '../../constants';
+import { formatMXN, formatDateLong, formatDateShort, formatTime, isValidMexicanPhone } from '../../services/format';
+import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, Loader2 } from 'lucide-react';
 
 const BookingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,8 +17,8 @@ const BookingPage: React.FC = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
-  
-  // State for available slots & settings
+
+  // Horarios disponibles y configuración
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [shopSettings, setShopSettings] = useState<ShopSettings>(DEFAULT_SETTINGS);
@@ -37,7 +38,7 @@ const BookingPage: React.FC = () => {
             setAllBookings(fetchedBookings);
             setShopSettings(fetchedSettings);
         } catch (error) {
-            console.error("Error loading initial data", error);
+            console.error("Error al cargar los datos iniciales", error);
         } finally {
             setLoadingData(false);
         }
@@ -45,12 +46,12 @@ const BookingPage: React.FC = () => {
     initData();
   }, []);
 
-  // Helper to generate time slots based on settings
+  // Genera los horarios según la configuración de la barbería
   const generateTimeSlots = (settings: ShopSettings) => {
       const slots: string[] = [];
       const [startH, startM] = settings.workStartTime.split(':').map(Number);
       const [endH, endM] = settings.workEndTime.split(':').map(Number);
-      
+
       let currentH = startH;
       let currentM = startM;
 
@@ -58,18 +59,18 @@ const BookingPage: React.FC = () => {
 
       while (true) {
           const currentTotalMinutes = currentH * 60 + currentM;
-          
-          // Stop if we reached or exceeded end time
+
+          // Detenerse al llegar a la hora de cierre
           if (currentTotalMinutes >= endTotalMinutes) break;
 
           const timeString = `${currentH.toString().padStart(2, '0')}:${currentM.toString().padStart(2, '0')}`;
-          
-          // Check Break Time
+
+          // Revisar la hora de descanso
           let inBreak = false;
           if (settings.breakStartTime && settings.breakEndTime) {
                const [breakStartH, breakStartM] = settings.breakStartTime.split(':').map(Number);
                const [breakEndH, breakEndM] = settings.breakEndTime.split(':').map(Number);
-               
+
                const breakStartTotal = breakStartH * 60 + breakStartM;
                const breakEndTotal = breakEndH * 60 + breakEndM;
 
@@ -82,7 +83,7 @@ const BookingPage: React.FC = () => {
               slots.push(timeString);
           }
 
-          // Increment
+          // Avanzar al siguiente horario
           currentM += settings.slotInterval;
           if (currentM >= 60) {
               currentH += Math.floor(currentM / 60);
@@ -92,14 +93,14 @@ const BookingPage: React.FC = () => {
       return slots;
   };
 
-  // Update available slots when date or bookings change
+  // Actualiza los horarios disponibles cuando cambia la fecha o las citas
   useEffect(() => {
     if (loadingData) return;
 
     const dateString = selectedDate.toDateString();
-    const dayOfWeek = selectedDate.getDay(); // 0 (Sun) to 6 (Sat)
-    
-    // Check Day Off
+    const dayOfWeek = selectedDate.getDay(); // 0 (domingo) a 6 (sábado)
+
+    // ¿Es día de descanso?
     if (shopSettings.offDays.includes(dayOfWeek)) {
         setIsDayOff(true);
         setAvailableSlots([]);
@@ -109,24 +110,24 @@ const BookingPage: React.FC = () => {
         setIsDayOff(false);
     }
 
-    // Generate Base Slots
+    // Horarios base
     const slots = generateTimeSlots(shopSettings);
 
-    // Helper: convert "HH:MM" to minutes since midnight
+    // "HH:MM" a minutos desde la medianoche
     const toMinutes = (time: string) => {
         const [h, m] = time.split(':').map(Number);
         return h * 60 + m;
     };
 
-    // Bookings on the selected day
+    // Citas del día seleccionado
     const dayBookings = allBookings.filter(b => {
         const bookingDate = new Date(b.date);
         return bookingDate.toDateString() === dateString;
     });
 
-    // A slot is taken if it overlaps with any booking's time window
-    // (booking start -> start + totalDuration). This prevents double-booking
-    // even when a service takes longer than one slot.
+    // Un horario está ocupado si se cruza con alguna cita
+    // (inicio de la cita -> inicio + duración total). Así se evitan citas dobles
+    // aunque un servicio dure más de un horario.
     const isSlotTaken = (slot: string) => {
         const slotStart = toMinutes(slot);
         const slotEnd = slotStart + shopSettings.slotInterval;
@@ -138,26 +139,24 @@ const BookingPage: React.FC = () => {
     };
 
     let free = slots.filter(slot => !isSlotTaken(slot));
-    
-    // Check if selected date is today, and filter out passed times
+
+    // Si la fecha es hoy, quitar los horarios que ya pasaron
     const now = new Date();
     if (selectedDate.toDateString() === now.toDateString()) {
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
-        
+
         free = free.filter(slot => {
             const [h, m] = slot.split(':').map(Number);
-            // If hour is less than current hour, it's passed
             if (h < currentHour) return false;
-            // If hour is same, check minutes
             if (h === currentHour && m <= currentMinute) return false;
             return true;
         });
     }
 
     setAvailableSlots(free);
-    
-    // Clear selected time if it's no longer available
+
+    // Limpiar la hora elegida si ya no está disponible
     if (selectedTime && (!free.includes(selectedTime))) {
         setSelectedTime('');
     }
@@ -176,43 +175,40 @@ const BookingPage: React.FC = () => {
   const totalDuration = selectedServices.reduce((sum, s) => sum + s.durationMinutes, 0);
 
   const handleBooking = async () => {
-      if (!customerName || !customerPhone) {
-        setFormError('لطفا نام و شماره تماس خود را وارد کنید');
+      if (!customerName.trim() || !customerPhone.trim()) {
+        setFormError('Escribe tu nombre y tu número de celular.');
+        return;
+      }
+      if (!isValidMexicanPhone(customerPhone)) {
+        setFormError('Escribe un número de celular válido de 10 dígitos.');
         return;
       }
       setFormError('');
       setLoading(true);
       try {
         await createBooking({
-          customerName,
-          customerPhone,
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
           selectedServices,
           totalPrice,
           totalDuration,
           date: selectedDate.toISOString(),
           timeSlot: selectedTime
         });
-      
-        // Format date manually to ensure "Day Month Year" order (RTL friendly)
-        const d = selectedDate;
-        const day = new Intl.DateTimeFormat('fa-IR', { day: 'numeric' }).format(d);
-        const month = new Intl.DateTimeFormat('fa-IR', { month: 'long' }).format(d);
-        const year = new Intl.DateTimeFormat('fa-IR', { year: 'numeric' }).format(d).replace(/,/g, '');
-        const weekday = new Intl.DateTimeFormat('fa-IR', { weekday: 'long' }).format(d);
-      
-        const formattedDate = `${weekday}، ${day} ${month} ${year}`;
 
-        // Navigate to Success Receipt Page
+        // Ir a la página de confirmación
         navigate('/success', {
             state: {
-                customerName,
-                formattedDate: formattedDate,
+                customerName: customerName.trim(),
+                formattedDate: formatDateLong(selectedDate),
                 timeSlot: selectedTime,
+                servicesText: selectedServices.map(s => s.title).join(', '),
+                totalPrice
             }
         });
 
       } catch (e) {
-        setFormError('خطا در ثبت نوبت. لطفا دوباره تلاش کنید.');
+        setFormError('No pudimos guardar tu cita. Intenta de nuevo.');
       } finally {
         setLoading(false);
       }
@@ -222,43 +218,43 @@ const BookingPage: React.FC = () => {
       return (
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-slate-400">
               <Loader2 className="w-10 h-10 animate-spin text-amber-500 mb-4" />
-              <p>در حال دریافت اطلاعات...</p>
+              <p>Cargando información...</p>
           </div>
       );
   }
 
-  // --- Step 1: Select Services ---
+  // --- Paso 1: elegir servicios ---
   if (step === 1) {
     return (
       <div className="space-y-6 animate-in slide-in-from-right-4 pb-40 md:pb-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">انتخاب خدمات</h2>
-          <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">مرحله ۱ از ۳</span>
+          <h2 className="text-2xl font-bold text-white">Elige tus servicios</h2>
+          <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso 1 de 3</span>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           {services.map(service => {
             const isSelected = selectedServices.find(s => s.id === service.id);
             return (
-              <div 
+              <div
                 key={service.id}
                 onClick={() => toggleService(service)}
                 className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
-                  isSelected 
-                    ? 'border-amber-500 bg-amber-500/10' 
+                  isSelected
+                    ? 'border-amber-500 bg-amber-500/10'
                     : 'border-slate-800 hover:border-slate-700 bg-slate-900'
                 }`}
               >
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start gap-3">
                   <div>
                     <h3 className="font-bold text-lg text-white">{service.title}</h3>
                     <p className="text-sm text-slate-400 mt-2 leading-relaxed">{service.description}</p>
                     <div className="flex items-center gap-4 mt-4 text-xs font-medium text-slate-500">
-                      <span className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded"><Clock size={14} /> {service.durationMinutes} دقیقه</span>
+                      <span className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded"><Clock size={14} /> {service.durationMinutes} min</span>
                     </div>
                   </div>
-                  <div className="text-amber-500 font-bold text-lg">
-                    {service.price.toLocaleString()} تومان
+                  <div className="text-amber-500 font-bold text-lg whitespace-nowrap">
+                    {formatMXN(service.price)}
                   </div>
                 </div>
               </div>
@@ -266,20 +262,20 @@ const BookingPage: React.FC = () => {
           })}
         </div>
 
-        {/* Positioned at bottom-[70px] on mobile to sit above the 70px nav bar */}
+        {/* En el celular se coloca a 70px del fondo para quedar arriba de la barra de navegación */}
         <div className="fixed bottom-[70px] md:bottom-0 left-0 right-0 p-4 bg-slate-950 border-t border-slate-800 md:static md:bg-transparent md:border-0 z-40">
             <div className="max-w-4xl mx-auto flex justify-between items-center bg-slate-900 md:bg-transparent p-4 md:p-0 rounded-2xl md:rounded-none shadow-xl md:shadow-none border md:border-0 border-slate-800">
                 <div className="text-white">
-                    <span className="block text-xs text-slate-400">جمع کل</span>
-                    <span className="font-bold text-2xl text-amber-500">{totalPrice.toLocaleString()} <span className="text-sm text-slate-400">تومان</span></span>
+                    <span className="block text-xs text-slate-400">Total</span>
+                    <span className="font-bold text-2xl text-amber-500">{formatMXN(totalPrice)} <span className="text-sm text-slate-400">MXN</span></span>
                 </div>
-                <button 
+                <button
                     disabled={selectedServices.length === 0}
                     onClick={() => setStep(2)}
                     className="bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-amber-900/20 hover:bg-amber-700 transition-colors flex items-center gap-2"
                 >
-                    ادامه
-                    <ChevronLeft size={20} />
+                    Continuar
+                    <ChevronRight size={20} />
                 </button>
             </div>
         </div>
@@ -287,7 +283,7 @@ const BookingPage: React.FC = () => {
     );
   }
 
-  // --- Step 2: Date & Time ---
+  // --- Paso 2: fecha y hora ---
   if (step === 2) {
       const dates = Array.from({length: 14}, (_, i) => {
           const d = new Date();
@@ -298,23 +294,23 @@ const BookingPage: React.FC = () => {
       return (
         <div className="space-y-8 pb-40 md:pb-24 animate-in slide-in-from-right-4">
             <button onClick={() => setStep(1)} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
-                <ChevronRight size={16} /> بازگشت
+                <ChevronLeft size={16} /> Atrás
             </button>
-            
+
             <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white">انتخاب زمان</h2>
-                <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">مرحله ۲ از ۳</span>
+                <h2 className="text-2xl font-bold text-white">Elige fecha y hora</h2>
+                <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso 2 de 3</span>
             </div>
 
             <div className="space-y-4">
                 <h3 className="font-semibold text-slate-300 flex items-center gap-2">
-                    <CalendarIcon size={18} className="text-amber-500" /> تاریخ
+                    <CalendarIcon size={18} className="text-amber-500" /> Fecha
                 </h3>
                 <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                     {dates.map((date) => {
-                         const dayName = new Intl.DateTimeFormat('fa-IR', { weekday: 'long' }).format(date);
-                         const dayNumber = new Intl.DateTimeFormat('fa-IR', { day: 'numeric' }).format(date);
-                         const monthName = PERSIAN_MONTHS[parseInt(new Intl.DateTimeFormat('en-US-u-ca-persian', {month:'numeric'}).format(date)) - 1];
+                         const dayName = new Intl.DateTimeFormat('es-MX', { weekday: 'short' }).format(date);
+                         const dayNumber = new Intl.DateTimeFormat('es-MX', { day: 'numeric' }).format(date);
+                         const monthName = new Intl.DateTimeFormat('es-MX', { month: 'short' }).format(date);
 
                          const isSelected = date.toDateString() === selectedDate.toDateString();
 
@@ -323,14 +319,14 @@ const BookingPage: React.FC = () => {
                                 key={date.toISOString()}
                                 onClick={() => setSelectedDate(date)}
                                 className={`flex-shrink-0 w-24 h-32 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${
-                                    isSelected 
-                                    ? 'bg-amber-600 text-white border-amber-500 shadow-lg shadow-amber-900/20 scale-105' 
+                                    isSelected
+                                    ? 'bg-amber-600 text-white border-amber-500 shadow-lg shadow-amber-900/20 scale-105'
                                     : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-600 hover:bg-slate-800'
                                 }`}
                              >
-                                 <span className="text-xs opacity-80">{dayName}</span>
+                                 <span className="text-xs opacity-80 capitalize">{dayName}</span>
                                  <span className="text-3xl font-bold">{dayNumber}</span>
-                                 <span className="text-xs font-medium">{monthName}</span>
+                                 <span className="text-xs font-medium capitalize">{monthName}</span>
                              </button>
                          )
                     })}
@@ -339,48 +335,48 @@ const BookingPage: React.FC = () => {
 
             <div className="space-y-4">
                 <h3 className="font-semibold text-slate-300 flex items-center gap-2">
-                    <Clock size={18} className="text-amber-500" /> ساعت‌های موجود
+                    <Clock size={18} className="text-amber-500" /> Horarios disponibles
                 </h3>
-                
+
                 {isDayOff ? (
                     <div className="p-12 text-center border-2 border-dashed border-red-500/30 rounded-2xl text-red-400 bg-red-500/5 flex flex-col items-center gap-3">
                         <Ban size={32} />
-                        <span className="font-bold text-lg">آرایشگاه در این روز تعطیل است.</span>
-                        <span className="text-sm text-red-300">لطفا روز دیگری را انتخاب کنید.</span>
+                        <span className="font-bold text-lg">La barbería está cerrada este día.</span>
+                        <span className="text-sm text-red-300">Elige otro día, por favor.</span>
                     </div>
                 ) : availableSlots.length === 0 ? (
                     <div className="p-8 text-center border-2 border-dashed border-slate-800 rounded-2xl text-slate-500 bg-slate-900/50">
-                        برای این تاریخ وقت خالی وجود ندارد (یا تمام شده است). لطفا روز دیگری را انتخاب کنید.
+                        No hay horarios disponibles para esta fecha (o ya se ocuparon todos). Elige otro día, por favor.
                     </div>
                 ) : (
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                         {availableSlots.map(time => (
                             <button
                                 key={time}
                                 onClick={() => setSelectedTime(time)}
-                                className={`py-3 px-3 rounded-xl text-sm font-medium border transition-all ${
+                                className={`py-3 px-2 rounded-xl text-sm font-medium border transition-all ${
                                     selectedTime === time
                                     ? 'bg-white text-slate-900 border-white font-bold shadow-lg'
                                     : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-600 hover:bg-slate-800'
                                 }`}
                             >
-                                {time}
+                                {formatTime(time)}
                             </button>
                         ))}
                     </div>
                 )}
             </div>
 
-            {/* Positioned at bottom-[70px] on mobile to sit above the 70px nav bar */}
+            {/* En el celular se coloca a 70px del fondo para quedar arriba de la barra de navegación */}
             <div className="fixed bottom-[70px] md:bottom-0 left-0 right-0 p-4 bg-slate-950 border-t border-slate-800 md:static md:bg-transparent md:border-0 z-40">
                 <div className="max-w-4xl mx-auto flex justify-end">
-                    <button 
+                    <button
                         disabled={!selectedTime}
                         onClick={() => setStep(3)}
                         className="bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-amber-900/20 hover:bg-amber-700 transition-colors flex items-center gap-2"
                     >
-                        تایید نهایی
-                        <ChevronLeft size={20} />
+                        Continuar
+                        <ChevronRight size={20} />
                     </button>
                 </div>
             </div>
@@ -388,74 +384,79 @@ const BookingPage: React.FC = () => {
       );
   }
 
-  // --- Step 3: Confirmation ---
+  // --- Paso 3: datos y confirmación ---
   return (
     <div className="space-y-6 pb-24 animate-in slide-in-from-right-4">
         <button onClick={() => setStep(2)} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
-            <ChevronRight size={16} /> بازگشت
+            <ChevronLeft size={16} /> Atrás
         </button>
 
-        <h2 className="text-2xl font-bold text-white">اطلاعات شما</h2>
+        <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-white">Tus datos</h2>
+            <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso 3 de 3</span>
+        </div>
 
         <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
             <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">نام و نام خانوادگی</label>
+                <label className="block text-sm font-medium text-slate-400 mb-2">Nombre completo</label>
                 <div className="relative">
-                    <User className="absolute right-3 top-3.5 text-slate-500" size={20} />
-                    <input 
-                        type="text" 
+                    <User className="absolute left-3 top-3.5 text-slate-500" size={20} />
+                    <input
+                        type="text"
                         value={customerName}
-                                                onChange={(e) => { setCustomerName(e.target.value); setFormError(''); }}
-                        className="w-full pr-10 pl-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
-                        placeholder="مثال: علی محمدی"
+                        onChange={(e) => { setCustomerName(e.target.value); setFormError(''); }}
+                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
+                        placeholder="Ej. Juan Pérez"
                     />
                 </div>
             </div>
             <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">شماره موبایل</label>
-                <input 
-                    type="tel" 
+                <label className="block text-sm font-medium text-slate-400 mb-2">Celular (WhatsApp)</label>
+                <input
+                    type="tel"
                     value={customerPhone}
-                                        onChange={(e) => { setCustomerPhone(e.target.value); setFormError(''); }}
+                    onChange={(e) => { setCustomerPhone(e.target.value); setFormError(''); }}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
-                    placeholder="0912..."
-                    dir="ltr"
-                    style={{ textAlign: 'right' }}
+                    placeholder="55 1234 5678"
                 />
             </div>
         </div>
 
         <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
-             <h3 className="font-bold text-white mb-2">خلاصه رزرو</h3>
-             <div className="flex justify-between text-sm">
-                 <span className="text-slate-400">تاریخ:</span>
-                 <span className="font-medium text-slate-200">{new Intl.DateTimeFormat('fa-IR').format(selectedDate)}</span>
+             <h3 className="font-bold text-white mb-2">Resumen de tu cita</h3>
+             <div className="flex justify-between text-sm gap-4">
+                 <span className="text-slate-400">Servicios:</span>
+                 <span className="font-medium text-slate-200 text-right">{selectedServices.map(s => s.title).join(', ')}</span>
              </div>
              <div className="flex justify-between text-sm">
-                 <span className="text-slate-400">ساعت:</span>
-                 <span className="font-medium text-slate-200">{selectedTime}</span>
+                 <span className="text-slate-400">Fecha:</span>
+                 <span className="font-medium text-slate-200">{formatDateShort(selectedDate)}</span>
              </div>
              <div className="flex justify-between text-sm">
-                 <span className="text-slate-400">مدت زمان:</span>
-                 <span className="font-medium text-slate-200">{totalDuration} دقیقه</span>
+                 <span className="text-slate-400">Hora:</span>
+                 <span className="font-medium text-slate-200">{formatTime(selectedTime)}</span>
+             </div>
+             <div className="flex justify-between text-sm">
+                 <span className="text-slate-400">Duración:</span>
+                 <span className="font-medium text-slate-200">{totalDuration} min</span>
              </div>
              <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
-                 <span className="font-bold text-white">مبلغ قابل پرداخت:</span>
-                 <span className="font-bold text-xl text-amber-500">{totalPrice.toLocaleString()} تومان</span>
+                 <span className="font-bold text-white">Total a pagar en el local:</span>
+                 <span className="font-bold text-xl text-amber-500">{formatMXN(totalPrice)}</span>
              </div>
         </div>
 
         {formError && (
-                    <p className="text-red-500 text-sm text-center bg-red-500/10 py-3 rounded-xl border border-red-500/20">{formError}</p>
-                )}
+            <p className="text-red-500 text-sm text-center bg-red-500/10 py-3 rounded-xl border border-red-500/20">{formError}</p>
+        )}
 
-                <button 
-                    onClick={handleBooking}
-                    disabled={loading}
-                    className="w-full bg-white text-slate-950 py-4 rounded-xl font-bold shadow-lg hover:bg-slate-200 transition-all flex justify-center items-center gap-2"
-                >
-                    {loading ? 'در حال ثبت...' : 'ثبت قطعی نوبت'}
-                </button>
+        <button
+            onClick={handleBooking}
+            disabled={loading}
+            className="w-full bg-white text-slate-950 py-4 rounded-xl font-bold shadow-lg hover:bg-slate-200 transition-all flex justify-center items-center gap-2"
+        >
+            {loading ? 'Guardando...' : 'Confirmar cita'}
+        </button>
     </div>
   );
 };

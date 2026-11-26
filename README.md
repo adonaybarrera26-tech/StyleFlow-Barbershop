@@ -1,63 +1,49 @@
-# StyleFlow Barbershop 💈
+# StyleFlow Barbería 💈
 
-**English** | [نسخه فارسی](./README_fa.md)
+Sistema de citas en línea para barbería, en español (México) y con precios en pesos (MXN). Hecho con React, TypeScript y Vite. No necesita servidor ni base de datos.
 
-A modern, bilingual (Persian/English) barbershop booking app built with React, TypeScript and Vite. Fully offline-first with no backend required.
+> Versión de demostración: los datos se guardan en el navegador de cada persona (LocalStorage) y no se envían a ningún servidor.
 
-> **🌐 Live:** https://erpycode.github.io/StyleFlow-Barbershop/
+## ✨ Qué incluye
 
-## ✨ Features
+- **Reserva en 3 pasos:** elegir servicios → elegir fecha y hora → confirmar
+- **Confirmación por WhatsApp:** botón que abre WhatsApp con la cita ya escrita
+- **Panel de administración:** citas, servicios, horarios y días de descanso
+- **Exportar a Excel e imprimir** la agenda del día o de todas las citas
+- **Diseño oscuro** que funciona bien en celular y en computadora
 
-- **Bilingual + RTL** — one-click switch between Persian (RTL) and English (LTR)
-- **Online Booking** — 3-step flow: choose services → pick date & time → confirm
-- **Admin Panel** — manage services, bookings, and shop settings
-- **Excel Export & Print** — download daily/all bookings as `.xlsx` or print a report
-- **Offline-First Storage** — everything persists in the browser's LocalStorage, no database needed
-- **Polished UI** — dark theme, Vazirmatn font, smooth Motion animations
-- **Responsive** — works great on mobile and desktop
+## ⚙️ Cómo personalizarlo
 
-## 🧰 Tech Stack
+Todo lo importante está en [`constants.ts`](./constants.ts):
 
-| Layer    | Tech |
-|----------|------|
-| Frontend | React 18, TypeScript, Vite 5 |
-| Styling  | Tailwind CSS (CDN) |
-| Routing  | React Router (HashRouter) |
-| Animation| Motion |
-| Icons    | Lucide React |
-| Export   | xlsx |
-| Storage  | LocalStorage |
+| Qué cambiar | Dónde |
+|-------------|-------|
+| Nombre de la barbería, dirección y teléfono | `SHOP_INFO` |
+| Número de WhatsApp (lada + 10 dígitos, sin espacios) | `SHOP_INFO.whatsappNumber` |
+| Usuario y contraseña del panel | `ADMIN_CREDENTIALS` |
+| Servicios y precios iniciales | `INITIAL_SERVICES` |
+| Horario y días de descanso iniciales | `DEFAULT_SETTINGS` |
 
-## 🔑 Admin Credentials
+Usuario inicial del panel: `admin`. Cambia la contraseña antes de compartir la app.
 
-| Role  | Username | Password |
-|-------|----------|----------|
-| Admin | `admin`  | `admin`  |
+> ⚠️ Al ser una app sin servidor, la contraseña del panel es solo una barrera básica para demostraciones. Para un negocio real hace falta una base de datos y un acceso seguro.
 
-> ⚠️ Note — data lives in the browser and is never sent to a server.
+## 🚀 Publicarla con GitHub Pages
 
-## 📁 Project Structure
+1. En tu repositorio ve a **Settings → Pages** y en **Source** elige **GitHub Actions**.
+2. Cada vez que se guarden cambios en la rama `main`, la app se publica sola en `https://TU-USUARIO.github.io/StyleFlow-Barbershop/`.
 
-```
-├── pages/
-│   ├── Home.tsx              # Landing page
-│   ├── AboutProject.tsx      # About / credits
-│   ├── user/                 # Booking flow + success receipt
-│   └── admin/                # Admin login + dashboard
-├── services/
-│   ├── LanguageContext.tsx   # i18n (FA/EN)
-│   └── dataService.ts        # LocalStorage data layer
-├── components/Layout.tsx     # App shell + navigation
-├── constants.ts              # Default services & settings
-└── types.ts
+## 💻 Correrla en tu computadora
+
+```bash
+npm install
+npm run dev
 ```
 
-## 📄 License
+## 🧰 Tecnologías
 
-Licensed under the [MIT License](./LICENSE).
+React 18, TypeScript, Vite 5, Tailwind CSS (CDN), React Router (HashRouter), Motion, Lucide React y xlsx.
 
-Designed and developed by **ErPyCode** — a star on GitHub or a credit note is always appreciated. 💈
+## 📄 Licencia y créditos
 
----
-
-Made with ❤️ by [ErPyCode](https://github.com/erpycode)
+Basado en [StyleFlow Barbershop](https://github.com/erpycode/StyleFlow-Barbershop) de **ErPyCode**, bajo la [licencia MIT](./LICENSE). Esta versión está traducida al español de México y adaptada con precios en pesos y confirmación por WhatsApp.

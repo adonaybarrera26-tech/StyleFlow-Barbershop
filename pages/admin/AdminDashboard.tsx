@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Booking, Service, ShopSettings } from '../../types';
 import { getBookings, getServices, saveService, deleteService, getShopSettings, saveShopSettings, cleanupOldBookings } from '../../services/dataService';
 import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw } from 'lucide-react';
-import { DEFAULT_SETTINGS } from '../../constants';
+import { DEFAULT_SETTINGS, SHOP_INFO } from '../../constants';
+import { formatMXN, formatTime, formatDateTimeShort, getDateParts, escapeHtml } from '../../services/format';
 
 const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'bookings' | 'services' | 'settings'>('bookings');
@@ -15,10 +16,10 @@ const AdminDashboard: React.FC = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  
-  // Notification State
+
+  // Aviso emergente
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
-  // Service pending deletion (confirm modal)
+  // Servicio pendiente de eliminar (ventana de confirmación)
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
 
   const navigate = useNavigate();
@@ -32,12 +33,12 @@ const AdminDashboard: React.FC = () => {
     loadData();
   }, [navigate]);
 
-  // Auto-refresh every 5 minutes (300000 ms) if enabled
+  // Actualización automática cada 5 minutos (300000 ms) si está activada
   useEffect(() => {
       let intervalId: any;
       if (autoRefresh) {
           intervalId = setInterval(() => {
-              loadData(true); // true = silent refresh
+              loadData(true); // true = actualización silenciosa
           }, 300000);
       }
       return () => {
@@ -45,7 +46,7 @@ const AdminDashboard: React.FC = () => {
       };
   }, [autoRefresh]);
 
-  // Auto-hide notification after 3 seconds
+  // Ocultar el aviso después de 3 segundos
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => {
@@ -58,93 +59,82 @@ const AdminDashboard: React.FC = () => {
   const loadData = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
     try {
-        // First cleanup old bookings (yesterday and before)
+        // Primero limpiar citas antiguas (ayer y antes)
         await cleanupOldBookings();
 
         const b = await getBookings();
         const s = await getServices();
         const config = await getShopSettings();
-        
-        // Sort bookings: Date (Day) Ascending, then Time Ascending
+
+        // Ordenar citas: día ascendente y luego hora ascendente
         const sortedBookings = b.sort((a, b) => {
             const dateA = new Date(a.date);
             const dateB = new Date(b.date);
-            
-            // Normalize to YYYYMMDD to compare calendar days only
+
+            // Normalizar a AAAAMMDD para comparar solo días del calendario
             const dayA = dateA.getFullYear() * 10000 + dateA.getMonth() * 100 + dateA.getDate();
             const dayB = dateB.getFullYear() * 10000 + dateB.getMonth() * 100 + dateB.getDate();
-            
-            if (dayA !== dayB) return dayA - dayB; // Ascending: Earliest date first
-            return a.timeSlot.localeCompare(b.timeSlot); // Earliest time first within same day
+
+            if (dayA !== dayB) return dayA - dayB; // La fecha más próxima primero
+            return a.timeSlot.localeCompare(b.timeSlot); // La hora más temprana primero
         });
-        
+
         setBookings(sortedBookings);
         setServices(s);
         setSettings(config);
     } catch (error) {
-        console.error("Failed to load data", error);
+        console.error("No se pudieron cargar los datos", error);
     } finally {
         if (!silent) setIsRefreshing(false);
     }
   };
 
-  // Helper to format date strictly as "Day Month Year"
-  const getFormattedDateParts = (dateStr: string) => {
-      const d = new Date(dateStr);
-      const day = new Intl.DateTimeFormat('fa-IR', { day: 'numeric' }).format(d);
-      const month = new Intl.DateTimeFormat('fa-IR', { month: 'long' }).format(d);
-      const year = new Intl.DateTimeFormat('fa-IR', { year: 'numeric' }).format(d).replace('،', ''); // remove grouping comma if present
-      const weekday = new Intl.DateTimeFormat('fa-IR', { weekday: 'long' }).format(d);
-      
-      return {
-          day, month, year, weekday,
-          full: `${day} ${month} ${year}` // e.g. "13 Azar 1404"
-      };
-  };
+  // Fecha en partes: día de la semana y "26 de noviembre de 2026"
+  const getFormattedDateParts = (dateStr: string) => getDateParts(new Date(dateStr));
 
   const exportExcel = async () => {
-    // Load xlsx on demand so it doesn't bloat the main bundle
+    // xlsx se carga solo cuando hace falta para no hacer pesada la app
     const XLSX = await import('xlsx');
     const dataToExport = getDisplayedBookings();
     const data = dataToExport.map(b => {
       const { full } = getFormattedDateParts(b.date);
       return {
-        'نام مشتری': b.customerName,
-        'شماره تماس': b.customerPhone,
-        'خدمات انتخاب شده': b.selectedServices.map(s => s.title).join(', '),
-        'تاریخ': full,
-        'ساعت': b.timeSlot,
-        'قیمت کل': b.totalPrice,
-        'زمان ثبت': new Intl.DateTimeFormat('fa-IR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(b.createdAt))
+        'Cliente': b.customerName,
+        'Celular': b.customerPhone,
+        'Servicios': b.selectedServices.map(s => s.title).join(', '),
+        'Fecha': full,
+        'Hora': formatTime(b.timeSlot),
+        'Total (MXN)': b.totalPrice,
+        'Registrada': formatDateTimeShort(new Date(b.createdAt))
       };
     });
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Bookings");
-    XLSX.writeFile(wb, showTodayOnly ? "StyleFlow_Today.xlsx" : "StyleFlow_All_Bookings.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Citas");
+    XLSX.writeFile(wb, showTodayOnly ? "StyleFlow_Citas_de_Hoy.xlsx" : "StyleFlow_Todas_las_Citas.xlsx");
   };
 
-  // Generic Print Function (Handles both "Print All" and "Print Day")
+  // Función general de impresión (sirve para "Imprimir todas" y "Imprimir día")
   const handlePrint = (bookingsToPrint: Booking[], title: string) => {
       const grouped = groupBookingsByDate(bookingsToPrint);
-      // Sort dates ascending
+      // Fechas en orden ascendente
       const sortedKeys = Object.keys(grouped).sort((a, b) => {
         const [yA, mA, dA] = a.split('-').map(Number);
         const [yB, mB, dB] = b.split('-').map(Number);
         const dateA = new Date(yA, mA, dA).getTime();
         const dateB = new Date(yB, mB, dB).getTime();
-        return dateA - dateB; 
+        return dateA - dateB;
       });
 
       const printWindow = window.open('', '_blank');
       if (printWindow) {
           printWindow.document.write(`
-              <html dir="rtl">
+              <html lang="es-MX">
               <head>
-                  <title>چاپ نوبت‌ها - ${title}</title>
+                  <title>Imprimir citas - ${escapeHtml(title)}</title>
                   <style>
-                      body { font-family: 'Tahoma', 'Vazirmatn', sans-serif; padding: 20px; direction: rtl; color: #000; }
+                      body { font-family: Arial, Helvetica, sans-serif; padding: 20px; color: #000; }
                       h1 { text-align: center; margin-bottom: 10px; font-size: 24px; border-bottom: 2px solid #000; padding-bottom: 10px; }
                       h2 { font-size: 18px; margin-top: 30px; margin-bottom: 10px; background-color: #eee; padding: 10px; border-radius: 5px; }
                       .meta { text-align: center; margin-bottom: 30px; color: #555; font-size: 14px; }
@@ -162,37 +152,37 @@ const AdminDashboard: React.FC = () => {
                   </style>
               </head>
               <body>
-                  <h1>استایلفلو</h1>
-                  <div class="meta">گزارش نوبت‌دهی: ${title}</div>
-                  
+                  <h1>${escapeHtml(SHOP_INFO.name)}</h1>
+                  <div class="meta">Reporte de citas: ${escapeHtml(title)}</div>
+
                   ${sortedKeys.map(dateKey => {
                       const dayBookings = grouped[dateKey];
                       dayBookings.sort((a, b) => a.timeSlot.localeCompare(b.timeSlot));
-                      
+
                       const sampleDate = dayBookings[0].date;
                       const { full, weekday } = getFormattedDateParts(sampleDate);
 
                       return `
                           <div class="date-group">
-                              <h2>${weekday}، ${full}</h2>
+                              <h2>${escapeHtml(weekday)}, ${escapeHtml(full)}</h2>
                               <table>
                                   <thead>
                                       <tr>
-                                          <th width="10%">ساعت</th>
-                                          <th width="25%">نام مشتری</th>
-                                          <th width="20%">شماره تماس</th>
-                                          <th width="30%">خدمات</th>
-                                          <th width="15%">مبلغ (تومان)</th>
+                                          <th width="12%">Hora</th>
+                                          <th width="25%">Cliente</th>
+                                          <th width="20%">Celular</th>
+                                          <th width="28%">Servicios</th>
+                                          <th width="15%">Total (MXN)</th>
                                       </tr>
                                   </thead>
                                   <tbody>
                                       ${dayBookings.map(b => `
                                           <tr>
-                                              <td><b>${b.timeSlot}</b></td>
-                                              <td>${b.customerName}</td>
-                                              <td>${b.customerPhone}</td>
-                                              <td>${b.selectedServices.map(s => s.title).join('، ')}</td>
-                                              <td>${b.totalPrice.toLocaleString()}</td>
+                                              <td><b>${escapeHtml(formatTime(b.timeSlot))}</b></td>
+                                              <td>${escapeHtml(b.customerName)}</td>
+                                              <td>${escapeHtml(b.customerPhone)}</td>
+                                              <td>${escapeHtml(b.selectedServices.map(s => s.title).join(', '))}</td>
+                                              <td>${escapeHtml(formatMXN(b.totalPrice))}</td>
                                           </tr>
                                       `).join('')}
                                   </tbody>
@@ -213,7 +203,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleSaveService = async () => {
     if (!editingService?.title || !editingService?.price) return;
-    
+
     const newService: Service = {
       id: editingService.id || Math.random().toString(36).substr(2, 9),
       title: editingService.title,
@@ -225,7 +215,7 @@ const AdminDashboard: React.FC = () => {
     await saveService(newService);
     setEditingService(null);
     loadData();
-    setNotification({ type: 'success', message: 'خدمات با موفقیت به‌روزرسانی شد.' });
+    setNotification({ type: 'success', message: 'Servicio guardado correctamente.' });
   };
 
   const handleDeleteService = (service: Service) => {
@@ -237,16 +227,16 @@ const AdminDashboard: React.FC = () => {
     await deleteService(serviceToDelete.id);
     setServiceToDelete(null);
     loadData();
-    setNotification({ type: 'success', message: 'خدمت با موفقیت حذف شد.' });
+    setNotification({ type: 'success', message: 'Servicio eliminado correctamente.' });
   };
 
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
       await saveShopSettings(settings);
-      setNotification({ type: 'success', message: 'تنظیمات با موفقیت ذخیره شد.' });
+      setNotification({ type: 'success', message: 'Configuración guardada correctamente.' });
     } catch (e) {
-      setNotification({ type: 'error', message: 'خطا در ذخیره تنظیمات. لطفا اتصال اینترنت را بررسی کنید.' });
+      setNotification({ type: 'error', message: 'No se pudo guardar la configuración. Intenta de nuevo.' });
     } finally {
       setSavingSettings(false);
     }
@@ -270,7 +260,7 @@ const AdminDashboard: React.FC = () => {
       if (showTodayOnly) {
           const today = new Date();
           const todayVal = today.getFullYear() * 10000 + today.getMonth() * 100 + today.getDate();
-          
+
           return bookings
             .filter(b => {
                 const bd = new Date(b.date);
@@ -282,11 +272,11 @@ const AdminDashboard: React.FC = () => {
       return bookings;
   };
 
-  // Group bookings by date for the main view
+  // Agrupar las citas por fecha para la vista principal
   const groupBookingsByDate = (bookingList: Booking[]) => {
       const groups: { [key: string]: Booking[] } = {};
       bookingList.forEach(b => {
-          // Use YYYY-MM-DD as key to group by calendar day
+          // Se usa AAAA-M-D como llave para agrupar por día del calendario
           const d = new Date(b.date);
           const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
           if (!groups[key]) groups[key] = [];
@@ -297,156 +287,157 @@ const AdminDashboard: React.FC = () => {
 
   const displayedBookings = getDisplayedBookings();
   const groupedBookings = groupBookingsByDate(displayedBookings);
-  
-  // Sort date keys Ascending (Earliest date first)
+
+  // Ordenar las fechas de menor a mayor (la más próxima primero)
   const sortedDateKeys = Object.keys(groupedBookings).sort((a, b) => {
       const [yA, mA, dA] = a.split('-').map(Number);
       const [yB, mB, dB] = b.split('-').map(Number);
       const dateA = new Date(yA, mA, dA).getTime();
       const dateB = new Date(yB, mB, dB).getTime();
-      return dateA - dateB; // Ascending
+      return dateA - dateB;
   });
 
+  // id = número de día en JavaScript (0 = domingo ... 6 = sábado)
   const weekDays = [
-      { id: 6, label: 'شنبه' },
-      { id: 0, label: 'یکشنبه' },
-      { id: 1, label: 'دوشنبه' },
-      { id: 2, label: 'سه‌شنبه' },
-      { id: 3, label: 'چهارشنبه' },
-      { id: 4, label: 'پنج‌شنبه' },
-      { id: 5, label: 'جمعه' },
+      { id: 1, label: 'Lunes' },
+      { id: 2, label: 'Martes' },
+      { id: 3, label: 'Miércoles' },
+      { id: 4, label: 'Jueves' },
+      { id: 5, label: 'Viernes' },
+      { id: 6, label: 'Sábado' },
+      { id: 0, label: 'Domingo' },
   ];
 
   return (
-    <div className="space-y-6 pb-20 relative" dir="rtl">
-      {/* Notification Popup */}
+    <div className="space-y-6 pb-20 relative">
+      {/* Aviso emergente */}
       {notification && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
-                  <button 
+                  <button
                       onClick={() => setNotification(null)}
-                      className="absolute top-4 left-4 text-slate-500 hover:text-white transition-colors"
+                      className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
                   >
                       <X size={20} />
                   </button>
-                  
+
                   <div className="flex flex-col items-center text-center gap-4">
                       <div className={`w-16 h-16 rounded-full flex items-center justify-center ${notification.type === 'success' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                           {notification.type === 'success' ? <CheckCircle2 size={32} /> : <XCircle size={32} />}
                       </div>
                       <h3 className="text-xl font-bold text-white">
-                          {notification.type === 'success' ? 'موفقیت' : 'خطا'}
+                          {notification.type === 'success' ? 'Listo' : 'Error'}
                       </h3>
                       <p className="text-slate-400">
                           {notification.message}
                       </p>
-                      
-                      <button 
+
+                      <button
                           onClick={() => setNotification(null)}
                           className={`mt-2 w-full py-3 rounded-xl font-bold text-white transition-all ${
                               notification.type === 'success' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
                           }`}
                       >
-                          متوجه شدم
+                          Entendido
                       </button>
                   </div>
               </div>
           </div>
       )}
 
-            {/* Delete Service Confirm Modal */}
-            {serviceToDelete && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
-                        <button 
-                            onClick={() => setServiceToDelete(null)}
-                            className="absolute top-4 left-4 text-slate-500 hover:text-white transition-colors"
-                        >
-                            <X size={20} />
-                        </button>
-                  
-                        <div className="flex flex-col items-center text-center gap-4">
-                            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500/10 text-red-500">
-                                <Trash2 size={32} />
-                            </div>
-                            <h3 className="text-xl font-bold text-white">حذف خدمت</h3>
-                            <p className="text-slate-400">
-                                آیا از حذف «{serviceToDelete.title}» اطمینان دارید؟
-                            </p>
-                      
-                            <div className="flex gap-3 w-full">
-                                <button 
-                                    onClick={() => setServiceToDelete(null)}
-                                    className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all"
-                                >
-                                    انصراف
-                                </button>
-                                <button 
-                                    onClick={confirmDeleteService}
-                                    className="flex-1 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-all"
-                                >
-                                    حذف
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+      {/* Ventana para confirmar la eliminación de un servicio */}
+      {serviceToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
+                  <button
+                      onClick={() => setServiceToDelete(null)}
+                      className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
+                  >
+                      <X size={20} />
+                  </button>
 
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <h2 className="text-3xl font-black text-white">داشبورد مدیریت استایلفلو</h2>
-        <button onClick={logout} className="text-red-400 hover:text-red-300 text-sm font-medium border border-red-500/20 px-4 py-2 rounded-lg hover:bg-red-500/10 transition-colors">خروج از حساب</button>
+                  <div className="flex flex-col items-center text-center gap-4">
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500/10 text-red-500">
+                          <Trash2 size={32} />
+                      </div>
+                      <h3 className="text-xl font-bold text-white">Eliminar servicio</h3>
+                      <p className="text-slate-400">
+                          ¿Seguro que quieres eliminar «{serviceToDelete.title}»?
+                      </p>
+
+                      <div className="flex gap-3 w-full">
+                          <button
+                              onClick={() => setServiceToDelete(null)}
+                              className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all"
+                          >
+                              Cancelar
+                          </button>
+                          <button
+                              onClick={confirmDeleteService}
+                              className="flex-1 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-all"
+                          >
+                              Eliminar
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <h2 className="text-3xl font-black text-white">Panel de administración</h2>
+        <button onClick={logout} className="text-red-400 hover:text-red-300 text-sm font-medium border border-red-500/20 px-4 py-2 rounded-lg hover:bg-red-500/10 transition-colors">Cerrar sesión</button>
       </div>
 
       <div className="flex gap-4 border-b border-slate-800 overflow-x-auto">
-        <button 
+        <button
           onClick={() => setActiveTab('bookings')}
           className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'bookings' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
         >
-          لیست نوبت‌ها
+          Citas
           {activeTab === 'bookings' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('services')}
           className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'services' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
         >
-          مدیریت خدمات
+          Servicios
           {activeTab === 'services' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('settings')}
           className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'settings' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
         >
-          تنظیمات
+          Configuración
           {activeTab === 'settings' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
         </button>
       </div>
 
       {activeTab === 'bookings' && (
         <div className="space-y-6 animate-in fade-in">
-          
-          {/* Action Bar */}
+
+          {/* Barra de acciones */}
           <div className="flex flex-col xl:flex-row gap-4 justify-between bg-slate-900 p-4 rounded-xl border border-slate-800">
               <div className="flex flex-wrap items-center gap-3">
-                  <button 
+                  <button
                       onClick={() => setShowTodayOnly(!showTodayOnly)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                          showTodayOnly 
-                          ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20 ring-2 ring-amber-500 ring-offset-2 ring-offset-slate-900' 
+                          showTodayOnly
+                          ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20 ring-2 ring-amber-500 ring-offset-2 ring-offset-slate-900'
                           : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                       }`}
                   >
                       {showTodayOnly ? <CalendarCheck size={18} /> : <Filter size={18} />}
-                      {showTodayOnly ? 'نمایش همه نوبت‌ها' : 'فقط نوبت‌های امروز'}
+                      {showTodayOnly ? 'Ver todas las citas' : 'Solo citas de hoy'}
                   </button>
 
-                  <button 
+                  <button
                     onClick={() => loadData(false)}
                     disabled={isRefreshing}
                     className="flex items-center gap-2 bg-slate-800 text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors border border-slate-700"
                   >
                     <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
-                    <span>بروزرسانی</span>
+                    <span>Actualizar</span>
                   </button>
 
                   <button
@@ -458,91 +449,91 @@ const AdminDashboard: React.FC = () => {
                     }`}
                   >
                       <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`}></div>
-                      {autoRefresh ? 'رفرش خودکار فعال' : 'رفرش خودکار غیرفعال'}
+                      {autoRefresh ? 'Actualización automática: sí' : 'Actualización automática: no'}
                   </button>
-                  
+
                   {showTodayOnly && (
                       <span className="text-sm text-amber-500 font-medium animate-pulse ml-2">
-                          {displayedBookings.length} نوبت امروز
+                          {displayedBookings.length} {displayedBookings.length === 1 ? 'cita hoy' : 'citas hoy'}
                       </span>
                   )}
               </div>
 
-              <div className="flex gap-2">
-                  <button 
-                    onClick={() => handlePrint(bookings, 'همه نوبت‌ها')}
+              <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handlePrint(bookings, 'Todas las citas')}
                     className="flex items-center gap-2 bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-600 transition-colors"
                   >
                     <Printer size={18} />
-                    چاپ همه نوبت‌ها
+                    Imprimir todas
                   </button>
-                  <button 
+                  <button
                     onClick={exportExcel}
                     className="flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors shadow-lg shadow-green-900/20"
                   >
                     <Download size={18} />
-                    خروجی اکسل
+                    Exportar a Excel
                   </button>
               </div>
           </div>
-          
+
           <div className="space-y-8">
             {sortedDateKeys.length === 0 ? (
                  <div className="bg-slate-900 rounded-xl p-12 text-center border border-slate-800">
                     <CalendarCheck size={48} className="mx-auto text-slate-700 mb-4" />
-                    <p className="text-slate-500 text-lg">نوبتی برای نمایش وجود ندارد.</p>
+                    <p className="text-slate-500 text-lg">No hay citas para mostrar.</p>
                  </div>
             ) : (
                 sortedDateKeys.map(dateKey => {
                     const dayBookings = groupedBookings[dateKey];
-                    // Sort bookings within the day by time
+                    // Ordenar las citas del día por hora
                     dayBookings.sort((a, b) => a.timeSlot.localeCompare(b.timeSlot));
-                    
+
                     const sampleDate = dayBookings[0].date;
                     const { full, weekday } = getFormattedDateParts(sampleDate);
 
                     return (
                         <div key={dateKey} className="bg-slate-900 rounded-xl shadow-sm overflow-hidden border border-slate-800">
-                            {/* Date Header */}
+                            {/* Encabezado de la fecha */}
                             <div className="bg-slate-800/50 p-4 border-b border-slate-800 flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-3">
                                     <div className="bg-amber-500/10 text-amber-500 p-2 rounded-lg">
                                         <CalendarCheck size={20} />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-white text-lg flex items-center gap-2">
-                                            <span>{weekday}،</span>
+                                        <h3 className="font-bold text-white text-lg flex flex-wrap items-center gap-x-2">
+                                            <span>{weekday},</span>
                                             <span className="text-amber-500">{full}</span>
                                         </h3>
-                                        <span className="text-xs text-slate-500">{dayBookings.length} نوبت ثبت شده</span>
+                                        <span className="text-xs text-slate-500">{dayBookings.length} {dayBookings.length === 1 ? 'cita registrada' : 'citas registradas'}</span>
                                     </div>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => handlePrint(dayBookings, `${weekday} ${full}`)}
                                     className="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
                                 >
                                     <Printer size={14} />
-                                    چاپ نوبت‌ها
+                                    Imprimir
                                 </button>
                             </div>
 
-                            {/* Table */}
+                            {/* Tabla */}
                             <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-right">
+                            <table className="w-full text-sm text-left">
                                 <thead className="bg-slate-950/50 text-slate-400 font-medium border-b border-slate-800">
                                 <tr>
-                                    <th className="p-4 w-24">ساعت</th>
-                                    <th className="p-4">مشتری</th>
-                                    <th className="p-4">خدمات</th>
-                                    <th className="p-4">مبلغ</th>
+                                    <th className="p-4 w-28">Hora</th>
+                                    <th className="p-4">Cliente</th>
+                                    <th className="p-4">Servicios</th>
+                                    <th className="p-4">Total</th>
                                 </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800">
                                 {dayBookings.map(booking => (
                                     <tr key={booking.id} className="hover:bg-slate-800/30 transition-colors">
                                     <td className="p-4">
-                                        <div className="bg-slate-800 text-center py-1 px-2 rounded text-amber-500 font-bold border border-slate-700">
-                                            {booking.timeSlot}
+                                        <div className="bg-slate-800 text-center py-1 px-2 rounded text-amber-500 font-bold border border-slate-700 whitespace-nowrap">
+                                            {formatTime(booking.timeSlot)}
                                         </div>
                                     </td>
                                     <td className="p-4">
@@ -559,7 +550,7 @@ const AdminDashboard: React.FC = () => {
                                         </div>
                                     </td>
                                     <td className="p-4 font-bold text-white">
-                                        {booking.totalPrice.toLocaleString()}
+                                        {formatMXN(booking.totalPrice)}
                                     </td>
                                     </tr>
                                 ))}
@@ -577,50 +568,50 @@ const AdminDashboard: React.FC = () => {
       {activeTab === 'services' && (
         <div className="space-y-6 animate-in fade-in">
             {!editingService ? (
-                 <button 
+                 <button
                     onClick={() => setEditingService({})}
                     className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors border border-slate-700"
                  >
-                    <Plus size={18} /> افزودن خدمت جدید
+                    <Plus size={18} /> Agregar servicio
                  </button>
             ) : null}
 
            {editingService && (
                <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-4 animate-in fade-in slide-in-from-top-4">
-                   <h3 className="font-bold text-white">{editingService.id ? 'ویرایش خدمت' : 'افزودن خدمت جدید'}</h3>
+                   <h3 className="font-bold text-white">{editingService.id ? 'Editar servicio' : 'Agregar servicio'}</h3>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <input 
-                          type="text" 
-                          placeholder="عنوان خدمت"
+                       <input
+                          type="text"
+                          placeholder="Nombre del servicio"
                           value={editingService.title || ''}
                           onChange={e => setEditingService({...editingService, title: e.target.value})}
                           className="p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-amber-500 outline-none"
                        />
-                       <input 
-                          type="number" 
-                          placeholder="قیمت (تومان)"
+                       <input
+                          type="number"
+                          placeholder="Precio (MXN)"
                           value={editingService.price || ''}
                           onChange={e => setEditingService({...editingService, price: Number(e.target.value)})}
                           className="p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-amber-500 outline-none"
                        />
-                       <input 
-                          type="number" 
-                          placeholder="مدت زمان (دقیقه)"
+                       <input
+                          type="number"
+                          placeholder="Duración (minutos)"
                           value={editingService.durationMinutes || ''}
                           onChange={e => setEditingService({...editingService, durationMinutes: Number(e.target.value)})}
                           className="p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-amber-500 outline-none"
                        />
-                        <input 
-                          type="text" 
-                          placeholder="توضیحات کوتاه"
+                        <input
+                          type="text"
+                          placeholder="Descripción breve"
                           value={editingService.description || ''}
                           onChange={e => setEditingService({...editingService, description: e.target.value})}
                           className="p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-amber-500 outline-none"
                        />
                    </div>
                    <div className="flex justify-end gap-3">
-                       <button onClick={() => setEditingService(null)} className="px-4 py-2 text-slate-400 hover:bg-slate-800 rounded-lg">انصراف</button>
-                       <button onClick={handleSaveService} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700">ذخیره</button>
+                       <button onClick={() => setEditingService(null)} className="px-4 py-2 text-slate-400 hover:bg-slate-800 rounded-lg">Cancelar</button>
+                       <button onClick={handleSaveService} className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700">Guardar</button>
                    </div>
                </div>
            )}
@@ -630,8 +621,8 @@ const AdminDashboard: React.FC = () => {
                    <div key={service.id} className="bg-slate-900 p-5 rounded-xl border border-slate-800 shadow-sm flex justify-between items-start group hover:border-slate-700 transition-all">
                        <div>
                            <h4 className="font-bold text-white text-lg">{service.title}</h4>
-                           <p className="text-sm text-slate-400 mt-2">{service.price.toLocaleString()} تومان</p>
-                           <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><Clock size={12}/> {service.durationMinutes} دقیقه</p>
+                           <p className="text-sm text-slate-400 mt-2">{formatMXN(service.price)} MXN</p>
+                           <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><Clock size={12}/> {service.durationMinutes} min</p>
                        </div>
                        <div className="flex gap-2">
                            <button onClick={() => setEditingService(service)} className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-full transition-colors">
@@ -651,72 +642,72 @@ const AdminDashboard: React.FC = () => {
           <div className="bg-slate-900 p-8 rounded-xl border border-slate-800 shadow-xl animate-in fade-in">
               <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800">
                    <Settings className="text-amber-500" size={28} />
-                   <h2 className="text-2xl font-bold text-white">تنظیمات نوبت‌دهی</h2>
+                   <h2 className="text-2xl font-bold text-white">Configuración de citas</h2>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Working Hours */}
+                  {/* Horario de trabajo */}
                   <div className="space-y-4">
-                      <h3 className="font-bold text-white text-lg">ساعات کاری</h3>
+                      <h3 className="font-bold text-white text-lg">Horario de trabajo</h3>
                       <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="block text-slate-400 text-sm mb-2">ساعت شروع</label>
-                              <select 
+                              <label className="block text-slate-400 text-sm mb-2">Hora de apertura</label>
+                              <select
                                 value={settings.workStartTime}
                                 onChange={(e) => setSettings({...settings, workStartTime: e.target.value})}
                                 className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500"
                               >
                                   {Array.from({length: 24}, (_, i) => {
                                       const t = `${i.toString().padStart(2, '0')}:00`;
-                                      return <option key={t} value={t}>{t}</option>
+                                      return <option key={t} value={t}>{formatTime(t)}</option>
                                   })}
                               </select>
                           </div>
                           <div>
-                              <label className="block text-slate-400 text-sm mb-2">ساعت پایان</label>
-                              <select 
+                              <label className="block text-slate-400 text-sm mb-2">Hora de cierre</label>
+                              <select
                                 value={settings.workEndTime}
                                 onChange={(e) => setSettings({...settings, workEndTime: e.target.value})}
                                 className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500"
                               >
                                   {Array.from({length: 24}, (_, i) => {
                                       const t = `${i.toString().padStart(2, '0')}:00`;
-                                      return <option key={t} value={t}>{t}</option>
+                                      return <option key={t} value={t}>{formatTime(t)}</option>
                                   })}
                               </select>
                           </div>
                       </div>
                   </div>
 
-                  {/* Break Time */}
+                  {/* Descanso */}
                   <div className="space-y-4">
-                      <h3 className="font-bold text-white text-lg">زمان استراحت (ناهار)</h3>
+                      <h3 className="font-bold text-white text-lg">Descanso (hora de comida)</h3>
                       <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="block text-slate-400 text-sm mb-2">شروع استراحت</label>
-                              <select 
+                              <label className="block text-slate-400 text-sm mb-2">Inicio del descanso</label>
+                              <select
                                 value={settings.breakStartTime || ''}
                                 onChange={(e) => setSettings({...settings, breakStartTime: e.target.value || null})}
                                 className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500"
                               >
-                                  <option value="">بدون استراحت</option>
+                                  <option value="">Sin descanso</option>
                                   {Array.from({length: 24}, (_, i) => {
                                       const t = `${i.toString().padStart(2, '0')}:00`;
-                                      return <option key={t} value={t}>{t}</option>
+                                      return <option key={t} value={t}>{formatTime(t)}</option>
                                   })}
                               </select>
                           </div>
                           <div>
-                              <label className="block text-slate-400 text-sm mb-2">پایان استراحت</label>
-                              <select 
+                              <label className="block text-slate-400 text-sm mb-2">Fin del descanso</label>
+                              <select
                                 value={settings.breakEndTime || ''}
                                 onChange={(e) => setSettings({...settings, breakEndTime: e.target.value || null})}
                                 className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500"
                               >
-                                  <option value="">بدون استراحت</option>
+                                  <option value="">Sin descanso</option>
                                   {Array.from({length: 24}, (_, i) => {
                                       const t = `${i.toString().padStart(2, '0')}:00`;
-                                      return <option key={t} value={t}>{t}</option>
+                                      return <option key={t} value={t}>{formatTime(t)}</option>
                                   })}
                               </select>
                           </div>
@@ -724,12 +715,12 @@ const AdminDashboard: React.FC = () => {
                   </div>
               </div>
 
-              {/* Days Off */}
+              {/* Días de descanso */}
               <div className="mt-8">
-                  <h3 className="font-bold text-white text-lg mb-4">روزهای تعطیل</h3>
+                  <h3 className="font-bold text-white text-lg mb-4">Días de descanso</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {weekDays.map(day => (
-                          <div 
+                          <div
                             key={day.id}
                             onClick={() => toggleDayOff(day.id)}
                             className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center gap-3 ${
@@ -749,15 +740,15 @@ const AdminDashboard: React.FC = () => {
                   </div>
               </div>
 
-              {/* Save Button */}
+              {/* Botón de guardar */}
               <div className="mt-8 pt-6 border-t border-slate-800 flex justify-end">
-                  <button 
+                  <button
                     onClick={handleSaveSettings}
                     disabled={savingSettings}
                     className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-green-900/20 hover:bg-green-700 transition-all disabled:opacity-50"
                   >
                       {savingSettings ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Save size={20} />}
-                      ذخیره تغییرات
+                      Guardar cambios
                   </button>
               </div>
           </div>
