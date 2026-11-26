@@ -28,7 +28,7 @@ const Home: React.FC = () => {
         to="/booking"
         className="sticker mt-10 inline-flex items-center justify-center bg-amber-500 text-black font-display uppercase tracking-wider text-2xl px-10 py-4 rounded-xl hover:bg-amber-400"
       >
-        Reserva tu silla
+        Reserva tu cita
       </Link>
 
       <a

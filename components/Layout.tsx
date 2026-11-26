@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '../services/LanguageContext';
 
 // Frases de la cinta superior
-const TICKER_PHRASES = ['Corte fresco', 'Flow real', 'Reserva tu silla', 'Barba al punto'];
+const TICKER_PHRASES = ['Corte fresco', 'Flow real', 'Reserva tu cita', 'Barba al punto'];
 
 const Ticker: React.FC = () => {
   // El contenido se repite dos veces para que el movimiento no tenga saltos
