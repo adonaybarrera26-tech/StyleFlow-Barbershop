@@ -7,9 +7,9 @@ export const SHOP_INFO = {
   name: 'StyleFlow Barbería',
   tagline: 'Un corte, una barba y un estilo a tu medida, en un ambiente profesional',
   // WhatsApp: lada del país + número, solo dígitos y sin espacios.
-  // México: 52 + 10 dígitos. (Número de ejemplo: cámbialo por el real)
-  whatsappNumber: '525512345678',
-  displayPhone: '55 1234 5678',
+  // México: 52 + 10 dígitos. (Número de prueba: cámbialo por el de la barbería)
+  whatsappNumber: '525617527272',
+  displayPhone: '56 1752 7272',
   // Dirección de ejemplo: cámbiala por la real
   address: 'Calle Ejemplo 123, Col. Centro, Ciudad de México',
 };
