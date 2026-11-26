@@ -3,15 +3,190 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0B0A08" />
     <title>StyleFlow Barbería | Reserva tu cita</title>
     <meta name="description" content="StyleFlow Barbería - Sistema de citas en línea para barberías. Elige tu servicio, tu fecha y tu hora desde el celular." />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+      // Paleta "oro y negro 90s": se reemplazan los grises azulados (slate) por negros cálidos
+      // y el ámbar (amber) por oro, así toda la app cambia de look sin tocar cada pantalla.
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              slate: {
+                50: '#FAF4E3',
+                100: '#F1E8D0',
+                200: '#E4DBC4',
+                300: '#CFC6B0',
+                400: '#A89F8A',
+                500: '#857A66',
+                600: '#5C5242',
+                700: '#3A3326',
+                800: '#221E17',
+                900: '#15130F',
+                950: '#0B0A08'
+              },
+              amber: {
+                50: '#FFF8DB',
+                100: '#FFEFB0',
+                200: '#FFE27A',
+                300: '#FFD43B',
+                400: '#FFCC1F',
+                500: '#F2B705',
+                600: '#F2B705',
+                700: '#D99A00',
+                800: '#A87A00',
+                900: '#5A4300'
+              }
+            },
+            fontFamily: {
+              sans: ['Archivo', 'system-ui', 'sans-serif'],
+              display: ['Anton', 'Impact', 'sans-serif']
+            },
+            // Esquinas más cuadradas: look de cartel y sticker, no de tarjeta redondeada
+            borderRadius: {
+              lg: '0.25rem',
+              xl: '0.25rem',
+              '2xl': '0.375rem',
+              '3xl': '0.375rem'
+            }
+          }
+        }
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
       body {
-        font-family: 'Inter', system-ui, sans-serif;
-        background-color: #020617; /* Slate 950 */
-        color: #f8fafc;
+        font-family: 'Archivo', system-ui, sans-serif;
+        background-color: #0B0A08;
+        color: #F1E8D0;
+      }
+
+      /* Títulos principales: letras gruesas y en mayúsculas, como cartel de disco */
+      h1, h2 {
+        font-family: 'Anton', Impact, sans-serif;
+        font-weight: 400 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+
+      ::selection { background: #F2B705; color: #0B0A08; }
+
+      /* Contorno visible al navegar con teclado */
+      :focus-visible { outline: 3px solid #FFD43B; outline-offset: 2px; }
+
+      /* Textura de grano muy suave para que el negro no se vea plano */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 60;
+        opacity: 0.07;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      }
+
+      /* Texto negro sobre cualquier fondo dorado (botones, fechas elegidas, menú activo) */
+      .bg-amber-600, .bg-amber-600 * { color: #0B0A08 !important; }
+
+      /* Botón tipo sticker: sombra dura que "se aplasta" al presionar */
+      .sticker {
+        border: 2px solid #0B0A08;
+        box-shadow: 4px 4px 0 0 #F1E8D0;
+        transition: transform 0.08s ease, box-shadow 0.08s ease;
+      }
+      .sticker:active:not(:disabled) {
+        transform: translate(3px, 3px);
+        box-shadow: 1px 1px 0 0 #F1E8D0;
+      }
+
+      /* Franja de poste de barbero (oro y negro) */
+      .pole {
+        background: repeating-linear-gradient(-45deg, #F2B705 0 12px, #0B0A08 12px 24px);
+      }
+
+      /* Sello rojo de "reservado" */
+      .stamp {
+        display: inline-block;
+        font-family: 'Anton', Impact, sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #E63946;
+        border: 3px solid #E63946;
+        padding: 0.15rem 0.7rem;
+        transform: rotate(-5deg);
+      }
+
+      /* Disco de vinilo: el elemento principal de la portada */
+      .vinyl {
+        position: relative;
+        width: 15rem;
+        height: 15rem;
+        border-radius: 9999px;
+        background:
+          repeating-radial-gradient(circle at center, #0B0A08 0 2px, #1D1A14 2px 3px);
+        box-shadow: 0 0 0 4px #F2B705, 10px 10px 0 4px #F2B705;
+        animation: vinyl-spin 10s linear infinite;
+      }
+      .vinyl::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: conic-gradient(from 20deg, transparent 0 18%, rgba(255,255,255,0.16) 24%, transparent 30% 68%, rgba(255,255,255,0.12) 74%, transparent 80%);
+      }
+      .vinyl-label {
+        position: absolute;
+        inset: 32%;
+        border-radius: 9999px;
+        background: #F2B705;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 0 3px #0B0A08;
+      }
+      .vinyl-label::after {
+        content: '';
+        position: absolute;
+        width: 0.6rem;
+        height: 0.6rem;
+        border-radius: 9999px;
+        background: #0B0A08;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      @keyframes vinyl-spin { to { transform: rotate(360deg); } }
+
+      /* Cinta de frases que se desplaza arriba de la página */
+      .ticker {
+        overflow: hidden;
+        white-space: nowrap;
+        background: #F2B705;
+        color: #0B0A08;
+        border-bottom: 3px solid #0B0A08;
+      }
+      .ticker-track {
+        display: inline-flex;
+        align-items: center;
+        gap: 1.25rem;
+        padding: 0.45rem 0;
+        animation: ticker-move 30s linear infinite;
+      }
+      .ticker-item {
+        font-family: 'Anton', Impact, sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.95rem;
+      }
+      @keyframes ticker-move { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+      /* Respeta a quien prefiere menos movimiento */
+      @media (prefers-reduced-motion: reduce) {
+        .vinyl, .ticker-track { animation: none; }
       }
     </style>
   </head>

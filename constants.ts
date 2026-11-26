@@ -5,7 +5,7 @@ import { Service, ShopSettings } from './types';
 // ============================================================
 export const SHOP_INFO = {
   name: 'StyleFlow Barbería',
-  tagline: 'Un corte, una barba y un estilo a tu medida, en un ambiente profesional',
+  tagline: 'Corte fresco, flow real. Reserva tu silla en menos de un minuto.',
   // WhatsApp: lada del país + número, solo dígitos y sin espacios.
   // México: 52 + 10 dígitos. (Número de prueba: cámbialo por el de la barbería)
   whatsappNumber: '525617527272',

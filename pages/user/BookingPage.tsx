@@ -241,19 +241,19 @@ const BookingPage: React.FC = () => {
                 onClick={() => toggleService(service)}
                 className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
                   isSelected
-                    ? 'border-amber-500 bg-amber-500/10'
+                    ? 'border-amber-500 bg-amber-500/10 shadow-[4px_4px_0_0_#F2B705]'
                     : 'border-slate-800 hover:border-slate-700 bg-slate-900'
                 }`}
               >
                 <div className="flex justify-between items-start gap-3">
                   <div>
-                    <h3 className="font-bold text-lg text-white">{service.title}</h3>
+                    <h3 className="font-display uppercase tracking-wide text-2xl text-white">{service.title}</h3>
                     <p className="text-sm text-slate-400 mt-2 leading-relaxed">{service.description}</p>
                     <div className="flex items-center gap-4 mt-4 text-xs font-medium text-slate-500">
                       <span className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded"><Clock size={14} /> {service.durationMinutes} min</span>
                     </div>
                   </div>
-                  <div className="text-amber-500 font-bold text-lg whitespace-nowrap">
+                  <div className="font-display text-amber-500 text-3xl leading-none whitespace-nowrap">
                     {formatMXN(service.price)}
                   </div>
                 </div>
@@ -272,7 +272,7 @@ const BookingPage: React.FC = () => {
                 <button
                     disabled={selectedServices.length === 0}
                     onClick={() => setStep(2)}
-                    className="bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-amber-900/20 hover:bg-amber-700 transition-colors flex items-center gap-2"
+                    className="sticker bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400 flex items-center gap-2"
                 >
                     Continuar
                     <ChevronRight size={20} />
@@ -320,12 +320,12 @@ const BookingPage: React.FC = () => {
                                 onClick={() => setSelectedDate(date)}
                                 className={`flex-shrink-0 w-24 h-32 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${
                                     isSelected
-                                    ? 'bg-amber-600 text-white border-amber-500 shadow-lg shadow-amber-900/20 scale-105'
+                                    ? 'bg-amber-500 text-black border-amber-500 shadow-[4px_4px_0_0_#F1E8D0] -translate-y-1'
                                     : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-600 hover:bg-slate-800'
                                 }`}
                              >
                                  <span className="text-xs opacity-80 capitalize">{dayName}</span>
-                                 <span className="text-3xl font-bold">{dayNumber}</span>
+                                 <span className="font-display text-4xl">{dayNumber}</span>
                                  <span className="text-xs font-medium capitalize">{monthName}</span>
                              </button>
                          )
@@ -373,7 +373,7 @@ const BookingPage: React.FC = () => {
                     <button
                         disabled={!selectedTime}
                         onClick={() => setStep(3)}
-                        className="bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-amber-900/20 hover:bg-amber-700 transition-colors flex items-center gap-2"
+                        className="sticker bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400 flex items-center gap-2"
                     >
                         Continuar
                         <ChevronRight size={20} />
@@ -453,7 +453,7 @@ const BookingPage: React.FC = () => {
         <button
             onClick={handleBooking}
             disabled={loading}
-            className="w-full bg-white text-slate-950 py-4 rounded-xl font-bold shadow-lg hover:bg-slate-200 transition-all flex justify-center items-center gap-2"
+            className="sticker w-full bg-amber-500 text-black py-4 rounded-xl font-extrabold text-lg hover:bg-amber-400 flex justify-center items-center gap-2 disabled:opacity-60"
         >
             {loading ? 'Guardando...' : 'Confirmar cita'}
         </button>
