@@ -43,8 +43,7 @@ const SuccessPage: React.FC = () => {
 
       <div className="bg-slate-900 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl border border-slate-800 relative">
         {/* Decoración superior */}
-        <div className="h-32 bg-amber-600 flex items-center justify-center relative">
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+        <div className="h-32 pole flex items-center justify-center relative">
             <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center border-4 border-slate-900 shadow-xl z-10 translate-y-10">
                 <CheckCircle2 className="text-green-500 w-10 h-10" />
             </div>
@@ -54,6 +53,7 @@ const SuccessPage: React.FC = () => {
             <div>
                 <h2 className="text-2xl font-black text-white">¡Tu cita está reservada!</h2>
                 <p className="text-slate-400 text-sm mt-2">Comprobante de cita en {SHOP_INFO.name}</p>
+                <span className="stamp mt-4">Reservado</span>
             </div>
 
             {/* Detalles del comprobante */}
