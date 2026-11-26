@@ -333,7 +333,8 @@ begin
 end;
 $$;
 
--- Regresa true si canceló la cita, false si no pudo (celular distinto, cita pasada o inexistente)
+-- Regresa true si canceló la cita, false si no pudo (celular distinto, cita pasada o inexistente).
+-- Si se canceló, avisa por Telegram (sección 9; si no está configurado, no hace nada).
 create or replace function public.cancel_my_booking(p_booking_id uuid, p_phone text)
 returns boolean
 language plpgsql
@@ -342,7 +343,7 @@ set search_path = public
 as $$
 declare
   v_digits text;
-  v_deleted integer;
+  v_row public.bookings%rowtype;
 begin
   v_digits := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
   if length(v_digits) < 10 or length(v_digits) > 15 then
@@ -352,10 +353,22 @@ begin
   delete from public.bookings b
   where b.id = p_booking_id
     and right(regexp_replace(b.customer_phone, '\D', '', 'g'), 10) = right(v_digits, 10)
-    and b.booking_date >= (now() at time zone 'America/Mexico_City')::date;
+    and b.booking_date >= (now() at time zone 'America/Mexico_City')::date
+  returning b.* into v_row;
 
-  get diagnostics v_deleted = row_count;
-  return v_deleted > 0;
+  if not found then
+    return false;
+  end if;
+
+  perform public.send_telegram(
+    E'❌ Cita cancelada por el cliente\n' ||
+    E'👤 ' || v_row.customer_name || E'\n' ||
+    E'📅 ' || public.format_slot_es(v_row.booking_date, v_row.time_slot) || E'\n' ||
+    E'✂️ ' || coalesce((select string_agg(e ->> 'title', ', ') from jsonb_array_elements(v_row.services) e), '') || E'\n' ||
+    E'📱 ' || v_row.customer_phone
+  );
+
+  return true;
 end;
 $$;
 
@@ -363,3 +376,116 @@ revoke all on function public.get_my_bookings(text) from public, anon, authentic
 revoke all on function public.cancel_my_booking(uuid, text) from public, anon, authenticated;
 grant execute on function public.get_my_bookings(text) to anon, authenticated;
 grant execute on function public.cancel_my_booking(uuid, text) to anon, authenticated;
+
+-- 9) AVISOS POR TELEGRAM AL BARBERO ----------------------------------------
+-- Cada vez que se reserva una cita (o un cliente cancela la suya) llega un
+-- mensaje al Telegram del barbero. Es opcional: mientras no exista el token,
+-- no hace nada y las citas se guardan normal.
+--
+-- Cómo activarlo (una vez por barbería):
+--   1. En Telegram, con @BotFather: /newbot. Guarda el token que te da.
+--   2. Abre tu bot nuevo y toca "Iniciar" (si no, el bot no puede escribirte).
+--   3. Con @userinfobot obtén tu Id (un número).
+--   4. En el editor SQL de Supabase, ejecuta (con TU token e Id):
+--        select vault.create_secret('PEGA_AQUÍ_EL_TOKEN', 'telegram_bot_token');
+--        insert into public.notify_chats (chat_id, label) values (123456789, 'Barbero');
+--   El token queda en Supabase Vault (cifrado), nunca en el código.
+--   Para quitar a alguien:  delete from public.notify_chats where chat_id = 123456789;
+
+create extension if not exists pg_net;
+
+-- Chats de Telegram que reciben los avisos (nadie desde la app puede leerla)
+create table if not exists public.notify_chats (
+  chat_id bigint primary key,
+  label text not null default '',
+  created_at timestamptz not null default now()
+);
+alter table public.notify_chats enable row level security;
+revoke all on public.notify_chats from anon, authenticated;
+
+-- "Jueves 3 de diciembre, 2:00 p.m."
+create or replace function public.format_slot_es(p_date date, p_slot text)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select
+    upper(left((array['domingo','lunes','martes','miércoles','jueves','viernes','sábado'])[extract(dow from p_date)::int + 1], 1))
+    || substr((array['domingo','lunes','martes','miércoles','jueves','viernes','sábado'])[extract(dow from p_date)::int + 1], 2)
+    || ' ' || extract(day from p_date)::int
+    || ' de ' || (array['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'])[extract(month from p_date)::int]
+    || ', '
+    || (case when split_part(p_slot, ':', 1)::int % 12 = 0 then 12 else split_part(p_slot, ':', 1)::int % 12 end)
+    || ':' || split_part(p_slot, ':', 2)
+    || ' ' || (case when split_part(p_slot, ':', 1)::int < 12 then 'a.m.' else 'p.m.' end);
+$$;
+
+-- Manda un texto a todos los chats registrados. Nunca lanza errores:
+-- avisar no debe impedir guardar o cancelar una cita.
+create or replace function public.send_telegram(p_text text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_token text;
+  v_chat record;
+begin
+  select s.decrypted_secret into v_token
+  from vault.decrypted_secrets s
+  where s.name = 'telegram_bot_token'
+  limit 1;
+
+  if v_token is null or v_token = '' then
+    return;
+  end if;
+
+  for v_chat in select chat_id from public.notify_chats loop
+    perform net.http_post(
+      url := 'https://api.telegram.org/bot' || v_token || '/sendMessage',
+      body := jsonb_build_object('chat_id', v_chat.chat_id, 'text', p_text),
+      headers := '{"Content-Type": "application/json"}'::jsonb
+    );
+  end loop;
+exception when others then
+  null;
+end;
+$$;
+
+revoke all on function public.send_telegram(text) from public, anon, authenticated;
+
+-- Aviso de cita nueva
+create or replace function public.notify_new_booking()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.send_telegram(
+    E'💈 Nueva cita\n' ||
+    E'👤 ' || new.customer_name || E'\n' ||
+    E'📅 ' || public.format_slot_es(new.booking_date, new.time_slot) || E'\n' ||
+    E'✂️ ' || coalesce((select string_agg(e ->> 'title', ', ') from jsonb_array_elements(new.services) e), '') || E'\n' ||
+    E'💵 $' || to_char(new.total_price, 'FM999,999,990') || E'\n' ||
+    E'📱 ' || new.customer_phone
+  );
+  return new;
+exception when others then
+  return new;
+end;
+$$;
+
+revoke all on function public.notify_new_booking() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'bookings_notify_insert') then
+    create trigger bookings_notify_insert
+      after insert on public.bookings
+      for each row execute function public.notify_new_booking();
+  end if;
+end;
+$$;
