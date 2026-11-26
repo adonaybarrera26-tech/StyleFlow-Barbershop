@@ -276,3 +276,70 @@ where not exists (select 1 from public.services);
 -- 7) ADMINISTRADOR ---------------------------------------------------------
 -- Después de crear el usuario en Authentication → Users, agrega su correo:
 --   insert into public.admins (email) values ('correo@ejemplo.com') on conflict do nothing;
+
+-- 8) MIS RESERVAS (el cliente ve y cancela sus propias citas) -------------
+-- Se busca por celular (se comparan los últimos 10 dígitos). Para no exponer
+-- datos personales, la búsqueda NO regresa nombre ni teléfono, solo muestra
+-- citas de hoy en adelante, y solo se cancela una cita si el celular coincide.
+
+create or replace function public.get_my_bookings(p_phone text)
+returns table (
+  id uuid,
+  booking_date date,
+  time_slot text,
+  services jsonb,
+  total_price integer,
+  total_duration integer
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_digits text;
+begin
+  v_digits := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
+  if length(v_digits) < 10 or length(v_digits) > 15 then
+    raise exception 'invalid_phone';
+  end if;
+
+  return query
+    select b.id, b.booking_date, b.time_slot, b.services, b.total_price, b.total_duration
+    from public.bookings b
+    where right(regexp_replace(b.customer_phone, '\D', '', 'g'), 10) = right(v_digits, 10)
+      and b.booking_date >= (now() at time zone 'America/Mexico_City')::date
+    order by b.booking_date, b.time_slot;
+end;
+$$;
+
+-- Regresa true si canceló la cita, false si no pudo (celular distinto, cita pasada o inexistente)
+create or replace function public.cancel_my_booking(p_booking_id uuid, p_phone text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_digits text;
+  v_deleted integer;
+begin
+  v_digits := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
+  if length(v_digits) < 10 or length(v_digits) > 15 then
+    raise exception 'invalid_phone';
+  end if;
+
+  delete from public.bookings b
+  where b.id = p_booking_id
+    and right(regexp_replace(b.customer_phone, '\D', '', 'g'), 10) = right(v_digits, 10)
+    and b.booking_date >= (now() at time zone 'America/Mexico_City')::date;
+
+  get diagnostics v_deleted = row_count;
+  return v_deleted > 0;
+end;
+$$;
+
+revoke all on function public.get_my_bookings(text) from public, anon, authenticated;
+revoke all on function public.cancel_my_booking(uuid, text) from public, anon, authenticated;
+grant execute on function public.get_my_bookings(text) to anon, authenticated;
+grant execute on function public.cancel_my_booking(uuid, text) to anon, authenticated;
