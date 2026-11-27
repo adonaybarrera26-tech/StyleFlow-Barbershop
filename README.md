@@ -48,6 +48,19 @@ Con la base de datos activa, el panel de administración entra con **correo y co
 1. En tu repositorio ve a **Settings → Pages** y en **Source** elige **GitHub Actions**.
 2. Cada vez que se guarden cambios en la rama `main`, la app se publica sola en `https://TU-USUARIO.github.io/StyleFlow-Barbershop/`.
 
+## 🌐 Publicarla con tu propio dominio (Cloudflare Pages)
+
+1. En [Cloudflare](https://dash.cloudflare.com) entra a **Workers & Pages → Create → Pages → Connect to Git** y elige este repositorio.
+2. Comando de construcción: `npm run build`. Carpeta de salida: `dist`.
+3. No hace falta definir `VITE_BASE`: sin ella la página se construye para vivir en la raíz (`/`), que es lo que necesita un dominio propio.
+4. En el proyecto, pestaña **Custom domains**, agrega tu dominio.
+
+El despliegue de GitHub Pages sigue funcionando al mismo tiempo, porque su flujo define `VITE_BASE=/StyleFlow-Barbershop/`.
+
+## ⏰ Aviso diario para que Supabase no se pause
+
+En el plan gratis, Supabase pausa el proyecto si pasa una semana con muy poca actividad. El flujo [`.github/workflows/mantener-activo.yml`](./.github/workflows/mantener-activo.yml) hace una consulta a la base una vez al día y falla (y GitHub te avisa por correo) si la base no responde. GitHub desactiva los flujos programados de los repositorios públicos que pasan 60 días sin actividad; si eso pasa, actívalo de nuevo en la pestaña **Actions**.
+
 ## 💻 Correrla en tu computadora
 
 ```bash

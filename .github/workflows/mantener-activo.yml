@@ -1,0 +1,43 @@
+name: Mantener Supabase activo
+
+# En el plan gratis, Supabase pausa el proyecto si pasa una semana con muy poca actividad.
+# Este flujo hace una consulta a la base una vez al día para que no se pause.
+# Si la base no responde bien, el flujo falla y GitHub te avisa por correo.
+
+on:
+  schedule:
+    - cron: '23 14 * * *' # todos los días a las 14:23 UTC (8:23 a.m. en Ciudad de México)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consultar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Consultar la base de datos
+        run: |
+          set -euo pipefail
+
+          # La dirección y la llave pública salen de constants.ts, así este flujo siempre usa la misma base que la página
+          url=$(grep -oP "url:\s*'\K[^']+" constants.ts | head -n 1 || true)
+          key=$(grep -oP "anonKey:\s*'\K[^']+" constants.ts | head -n 1 || true)
+          if [ -z "$url" ] || [ -z "$key" ]; then
+            echo "No encontré la dirección o la llave de Supabase en constants.ts (SUPABASE_CONFIG)."
+            exit 1
+          fi
+
+          status=$(curl --silent --show-error --max-time 30 \
+            --output respuesta.json --write-out '%{http_code}' \
+            "${url%/}/rest/v1/services?select=id&limit=1" \
+            -H "apikey: ${key}") || status="sin-respuesta"
+
+          echo "Respuesta de Supabase: ${status}"
+          if [ "$status" != "200" ]; then
+            echo "La base de datos no respondió bien. Revisa que el proyecto no esté pausado en supabase.com."
+            cat respuesta.json 2>/dev/null || true
+            exit 1
+          fi
