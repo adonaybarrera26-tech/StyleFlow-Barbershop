@@ -7,6 +7,7 @@ import SuccessPage from './pages/user/SuccessPage';
 import MyBookingsPage from './pages/user/MyBookingsPage';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import ResetPasswordForm from './pages/admin/AdminResetPassword';
 import AboutProject from './pages/AboutProject';
 import Welcome from './pages/Welcome';
 import NotFound, { BusinessNotFound } from './pages/NotFound';
@@ -18,6 +19,12 @@ import { DEFAULT_BUSINESS_SLUG, USE_HASH_ROUTER } from './constants';
 const AdminRedirect: React.FC = () => {
   const { path } = useBusiness();
   return <Navigate to={path('/admin/dashboard')} replace />;
+};
+
+// Nueva contraseña desde el enlace del correo, dentro del negocio (con su nombre y de ahí al panel)
+const BusinessResetPassword: React.FC = () => {
+  const { business, path } = useBusiness();
+  return <ResetPasswordForm business={business} loginPath={path('/admin/login')} panelPath={path('/admin/dashboard')} />;
 };
 
 // Con dirección limpia (dominio propio) o con # (GitHub Pages), según VITE_ROUTER
@@ -46,9 +53,11 @@ const App: React.FC = () => {
             <Route path="about" element={<AboutProject />} />
             <Route path="admin/login" element={<AdminLogin />} />
             <Route path="admin/dashboard" element={<AdminDashboard />} />
+            <Route path="admin/restablecer" element={<BusinessResetPassword />} />
             <Route path="admin" element={<AdminRedirect />} />
             <Route path="*" element={<BusinessNotFound />} />
           </Route>
+          <Route path="/restablecer" element={<ResetPasswordForm business={null} loginPath="/" panelPath="/" />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AppRouter>

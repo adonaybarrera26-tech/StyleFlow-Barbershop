@@ -1,6 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { captureAuthRedirect } from './services/supabase';
+
+// Si se llegó desde el enlace del correo de contraseña, se atiende antes de abrir la app
+captureAuthRedirect();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

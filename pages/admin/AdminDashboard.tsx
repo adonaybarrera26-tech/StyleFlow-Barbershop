@@ -5,10 +5,12 @@ import { getBookings, getServices, getLocations, getProfessionals, saveService, 
 import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw, MessageCircle, MapPin, User } from 'lucide-react';
 import { DEFAULT_SETTINGS, DEFAULT_WAIVER_TEXT } from '../../constants';
 import { useBusiness } from '../../services/BusinessContext';
+import { isSupabaseEnabled } from '../../services/supabase';
 import { formatMXN, formatTime, formatDateTimeShort, getDateParts, escapeHtml, buildCustomerWhatsAppLink } from '../../services/format';
 import AdminSummary from './AdminSummary';
 import AdminLocations, { WEEK_DAYS } from './AdminLocations';
 import AdminProfessionals from './AdminProfessionals';
+import AdminAccount from './AdminAccount';
 
 const AdminDashboard: React.FC = () => {
   const { business, path, url: businessUrl, refreshLocations } = useBusiness();
@@ -932,6 +934,7 @@ const AdminDashboard: React.FC = () => {
       )}
 
       {activeTab === 'settings' && (
+        <>
           <div className="bg-slate-900 p-8 rounded-xl border border-slate-800 shadow-xl animate-in fade-in">
               <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800">
                    <Settings className="text-amber-500" size={28} />
@@ -1127,6 +1130,8 @@ const AdminDashboard: React.FC = () => {
                   </button>
               </div>
           </div>
+          {isSupabaseEnabled() && <AdminAccount />}
+        </>
       )}
     </div>
   );

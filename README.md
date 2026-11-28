@@ -41,6 +41,9 @@ Con la base de datos activa (siguiente sección), cada negocio nuevo toma un min
 
    Crea el negocio, su horario inicial, unos servicios de ejemplo del giro y su administrador. Ya queda en `.../sereno-spa`.
 3. El administrador entra a `.../sereno-spa/admin`, cambia sus servicios y precios, y ajusta el horario.
+4. Contraseña: el administrador la cambia solo en **Configuración → Mi cuenta** (pide la actual). Si la olvida, usa **¿Olvidaste tu contraseña?** en el acceso y recibe un correo con un enlace. Para que ese correo llegue a cualquier persona hay que configurar en Supabase:
+   - **Authentication → URL Configuration:** en *Site URL* la dirección de la app (por ejemplo `https://adonaybarrera26-tech.github.io/StyleFlow-Barbershop/`) y en *Redirect URLs* la misma con `**` al final.
+   - **Authentication → Emails → SMTP Settings:** un servicio de correo propio (Resend, Brevo, etc.). Sin eso Supabase solo manda correos a los miembros de tu organización y con límite muy bajo.
 4. Para lo demás (teléfono visible, frase de portada, Instagram, Facebook, TikTok, mapa, etiquetas y promociones), abre **Table Editor → businesses** y llena las columnas del negocio.
 
 ### Varias sucursales, clases con cupo y deslinde
