@@ -91,6 +91,7 @@ export interface Booking {
   professionalId?: string | null; // con quién es la cita (vacío = el negocio no tiene profesionales)
   professionalName?: string; // nombre del profesional, para mostrarlo sin buscarlo
   status?: BookingStatus; // pendiente (por defecto) o confirmada por el negocio
+  remindedAt?: string | null; // cuándo se le mandó el recordatorio por WhatsApp (vacío = todavía no)
 }
 
 // Cita vista por el propio cliente en "Mis reservas": sin nombre ni teléfono

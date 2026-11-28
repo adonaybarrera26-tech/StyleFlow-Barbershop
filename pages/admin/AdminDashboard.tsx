@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Booking, BookingStatus, BusinessLocation, Professional, Service, BusinessSettings } from '../../types';
-import { getBookings, getServices, getLocations, getProfessionals, saveService, deleteService, deleteBooking, getBusinessSettings, saveBusinessSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin, setBookingStatus } from '../../services/dataService';
+import { getBookings, getServices, getLocations, getProfessionals, saveService, deleteService, deleteBooking, getBusinessSettings, saveBusinessSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin, setBookingStatus, setBookingReminded } from '../../services/dataService';
 import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw, MessageCircle, MapPin, User, Search } from 'lucide-react';
 import { DEFAULT_SETTINGS, DEFAULT_WAIVER_TEXT } from '../../constants';
 import { useBusiness } from '../../services/BusinessContext';
@@ -11,12 +11,14 @@ import AdminSummary from './AdminSummary';
 import AdminLocations, { WEEK_DAYS } from './AdminLocations';
 import AdminProfessionals from './AdminProfessionals';
 import AdminAccount from './AdminAccount';
+import AdminCustomers from './AdminCustomers';
+import AdminReminders from './AdminReminders';
 import StatusChip from '../../components/StatusChip';
 import { buildBookingConfirmedMessage } from '../../services/ticket';
 
 const AdminDashboard: React.FC = () => {
   const { business, path, url: businessUrl, refreshLocations } = useBusiness();
-  const [activeTab, setActiveTab] = useState<'summary' | 'bookings' | 'services' | 'locations' | 'team' | 'settings'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'bookings' | 'customers' | 'services' | 'locations' | 'team' | 'settings'>('summary');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   // Todas las sucursales del negocio (también las ocultas)
@@ -414,6 +416,19 @@ const AdminDashboard: React.FC = () => {
       }
   };
 
+  // Marca (o quita) que ya se le mandó el recordatorio al cliente (se ve al instante; si falla, regresa como estaba)
+  const changeReminded = async (b: Booking, reminded: boolean) => {
+      const previous = b.remindedAt ?? null;
+      const next = reminded ? new Date().toISOString() : null;
+      setBookings(list => list.map(x => (x.id === b.id ? { ...x, remindedAt: next } : x)));
+      try {
+          await setBookingReminded(business.id, b.id, next);
+      } catch (e) {
+          setBookings(list => list.map(x => (x.id === b.id ? { ...x, remindedAt: previous } : x)));
+          handleActionError(e, 'No se pudo guardar el recordatorio. Intenta de nuevo.');
+      }
+  };
+
   const getDisplayedBookings = () => {
       const inLocation = (b: Booking) =>
           (!locationFilter || b.locationId === locationFilter) && (!proFilter || b.professionalId === proFilter) &&
@@ -640,6 +655,13 @@ const AdminDashboard: React.FC = () => {
           {activeTab === 'bookings' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
         </button>
         <button
+          onClick={() => setActiveTab('customers')}
+          className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'customers' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          Clientes
+          {activeTab === 'customers' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
+        </button>
+        <button
           onClick={() => setActiveTab('services')}
           className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'services' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
         >
@@ -670,7 +692,22 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {activeTab === 'summary' && (
-        <AdminSummary bookings={bookings} onOpenBookings={() => setActiveTab('bookings')} />
+        <>
+          <AdminReminders
+            bookings={bookings}
+            businessName={business.name}
+            businessUrl={businessUrl}
+            locations={locations}
+            professionals={professionals}
+            onRemind={b => changeReminded(b, true)}
+            onUndo={b => changeReminded(b, false)}
+          />
+          <AdminSummary bookings={bookings} onOpenBookings={() => setActiveTab('bookings')} />
+        </>
+      )}
+
+      {activeTab === 'customers' && (
+        <AdminCustomers bookings={bookings} businessName={business.name} businessUrl={businessUrl} slug={business.slug} />
       )}
 
       {activeTab === 'bookings' && (

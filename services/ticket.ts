@@ -69,6 +69,23 @@ export const buildBookingConfirmedMessage = (
   );
 };
 
+// Recordatorio de una cita de hoy o de mañana (se abre en WhatsApp con el texto ya escrito)
+export const buildReminderMessage = (
+  b: Booking,
+  ctx: { when: 'hoy' | 'mañana'; businessName: string; siteUrl: string; locationName?: string; locationAddress?: string; professionalName?: string }
+): string => {
+  const firstName = b.customerName.trim().split(/\s+/)[0];
+  return (
+    `Hola ${firstName}, te recordamos tu cita de ${ctx.when} en ${ctx.businessName}:\n` +
+    (b.folio ? `• Folio: ${b.folio}\n` : '') +
+    `• Hora: ${formatTime(b.timeSlot)}\n` +
+    `• Servicios: ${b.selectedServices.map(s => s.title).join(', ')}\n` +
+    (ctx.professionalName ? `• Con: ${ctx.professionalName}\n` : '') +
+    (ctx.locationName ? `• Sucursal: ${ctx.locationName}${ctx.locationAddress ? ` (${ctx.locationAddress})` : ''}\n` : '') +
+    `Si no puedes asistir, avísanos o reagenda desde Mis reservas: ${ctx.siteUrl}/mis-reservas ¡Te esperamos!`
+  );
+};
+
 // Mensaje cuando la persona reagenda: dice qué horario tenía y cuál tiene ahora (no "acabo de reservar")
 export const buildRescheduleMessage = (
   t: MyBooking,

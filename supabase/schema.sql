@@ -196,6 +196,8 @@ create unique index if not exists bookings_folio_idx on public.bookings (busines
 -- Estado de la cita: pendiente o confirmada (la confirma el negocio desde el panel)
 alter table public.bookings add column if not exists status text not null default 'pending';
 alter table public.bookings add column if not exists confirmed_at timestamptz;
+-- Cuándo el negocio le mandó el recordatorio por WhatsApp al cliente (vacío = todavía no)
+alter table public.bookings add column if not exists reminded_at timestamptz;
 
 do $$
 begin
@@ -497,7 +499,7 @@ begin
       with check (public.is_business_admin(business_id));
   end if;
 end $$;
-grant update (status) on public.bookings to authenticated;
+grant update (status, reminded_at) on public.bookings to authenticated;
 
 -- 5) HORARIOS OCUPADOS (sin datos personales) ---------------------------
 
