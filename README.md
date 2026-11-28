@@ -49,7 +49,7 @@ Se cambian en **Table Editor → businesses** (todas son opcionales):
 
 | Columna | Qué hace | Ejemplo |
 |---------|----------|---------|
-| `theme` | Look completo. En blanco usa el de su giro (barbería→`barberia`, spa y estética→`spa`, dentista, médico y otro→`clinica`, nutriólogo→`natural`) | `natural` |
+| `theme` | Look completo. En blanco usa el de su giro (barbería→`barberia`, spa y estética→`spa`, dentista, médico y otro→`clinica`, nutriólogo→`natural`, estudio de pole/yoga/baile→`esencia`) | `natural` |
 | `brand_color` | Color principal de su marca. La app calcula sola los tonos y cuida que el texto se lea bien | `#1A8F6B` |
 | `logo_url` | Logo junto al nombre: un link `https://...` o un archivo de la carpeta `public/` | `demos/sereno-spa.svg` |
 
@@ -57,7 +57,7 @@ Los looks están en [`services/themes.ts`](./services/themes.ts) y las ilustraci
 
 ### Demos para enseñar a clientes
 
-[`supabase/demos.sql`](./supabase/demos.sql) crea tres negocios de ejemplo (spa, dentista y nutriólogo) con sus servicios, horarios, promoción y logo. Cambia el correo del inicio por el tuyo, pégalo en el SQL Editor y ejecútalo (se puede repetir). Quedan en `.../demo-spa`, `.../demo-dentista` y `.../demo-nutriologo`; la barbería de ejemplo es `.../demo-barberia`.
+[`supabase/demos.sql`](./supabase/demos.sql) crea cuatro negocios de ejemplo (spa, dentista, nutriólogo y estudio de pole) con sus servicios, horarios, promoción y logo. Cambia el correo del inicio por el tuyo, pégalo en el SQL Editor y ejecútalo (se puede repetir). Quedan en `.../demo-spa`, `.../demo-dentista`, `.../demo-nutriologo` y `.../demo-pole`; la barbería de ejemplo es `.../demo-barberia`.
 
 Las direcciones `admin`, `api`, `app` y `assets` están reservadas. Los negocios con `active = false` dejan de mostrarse.
 

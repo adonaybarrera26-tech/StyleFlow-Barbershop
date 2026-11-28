@@ -1,6 +1,7 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { HeroArt as HeroArtKind } from '../services/themes';
+import { assetUrl } from '../services/themes';
 
 // Ilustración de la portada. Cada giro tiene la suya; los colores salen del tema del negocio
 // (variables --art-1/2/3 y --accent-*), así que cambian solos con el color de su marca.
@@ -10,6 +11,7 @@ interface Props {
   kind: HeroArtKind;
   icon: LucideIcon; // ícono del giro
   category: string;
+  logoUrl?: string; // logo del negocio (lo usa la portada "logo")
 }
 
 const fill = (variable: string): React.CSSProperties => ({ fill: variable });
@@ -136,9 +138,26 @@ const Plate: React.FC = () => (
   </div>
 );
 
-const HeroArt: React.FC<Props> = ({ kind, icon, category }) => (
+// ---------- Estudios: el logo del negocio como protagonista, con halo y estrellas ----------
+const LogoArt: React.FC<{ src: string }> = ({ src }) => (
+  <div className="logo-art">
+    <svg className="logo-art-stars" viewBox="0 0 200 200" aria-hidden="true">
+      <g style={fill('rgb(var(--accent-300))')}>
+        <g transform="translate(14 36) scale(1.1)"><path className="twinkle" d={SPARKLE} /></g>
+        <g transform="translate(190 24) scale(0.8)"><path className="twinkle" d={SPARKLE} style={{ animationDelay: '-1.1s' }} /></g>
+        <g transform="translate(184 176) scale(1.3)"><path className="twinkle" d={SPARKLE} style={{ animationDelay: '-2.2s' }} /></g>
+        <g transform="translate(10 168) scale(0.7)"><path className="twinkle" d={SPARKLE} style={{ animationDelay: '-0.6s' }} /></g>
+      </g>
+    </svg>
+    <img src={src} alt="" width="240" height="240" />
+  </div>
+);
+
+const HeroArt: React.FC<Props> = ({ kind, icon, category, logoUrl }) => (
   <div aria-hidden="true" className="flex items-center justify-center">
     {kind === 'vinyl' && <Vinyl icon={icon} />}
+    {kind === 'logo' && logoUrl && <LogoArt src={assetUrl(logoUrl)} />}
+    {kind === 'logo' && !logoUrl && <Ripple icon={icon} lotus={false} />}
     {kind === 'ripple' && <Ripple icon={icon} lotus={category === 'spa'} />}
     {kind === 'tooth' && <Tooth />}
     {kind === 'plate' && <Plate />}

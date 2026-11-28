@@ -70,12 +70,19 @@
       --ticker-style: normal;
       --ticker-size: 0.95rem;
       --ticker-tracking: 0.08em;
+      --font-ticker: var(--font-display);
       --pole-bg: repeating-linear-gradient(-45deg, rgb(var(--accent-500)) 0 12px, rgb(var(--slate-950)) 12px 24px);
       --grain: 0.07;
       --stamp: 230 57 70;
       --art-1: rgb(var(--accent-500));
       --art-2: #0B0A08;
       --art-3: #1D1A14;
+      --bg-image: none;
+      --btn-gradient: none;
+      --btn-hover: none;
+      --font-lead: var(--font-body);
+      --logo-radius: 0.25rem;
+      --logo-ring: none;
       --focus: 255 212 59;
       --slate-50: 250 244 227;
       --slate-100: 241 232 208;
@@ -103,8 +110,59 @@
       body {
         font-family: var(--font-body);
         background-color: rgb(var(--slate-950));
+        /* Luces suaves de fondo (cada tema las define; la barbería no lleva) */
+        background-image: var(--bg-image);
+        background-attachment: fixed;
+        background-repeat: no-repeat;
         color: rgb(var(--slate-100));
       }
+
+      /* Frases de presentación (portada): en el tema Esencia van en una letra con más estilo */
+      .lead-text { font-family: var(--font-lead); }
+      html[data-theme='esencia'] .lead-text { font-size: 1.28em; line-height: 1.45; }
+
+      /* Barras fijas translúcidas con desenfoque (temas oscuros con "glass") */
+      html[data-glass='true'] .glass-bar {
+        background-color: rgb(var(--slate-950) / 0.72);
+        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(14px);
+      }
+
+      /* Tema Esencia: bordes dorados muy finos y cielo con estrellas, como el sitio de Pole Essence */
+      html[data-theme='esencia'] .border-slate-800 { border-color: rgb(var(--accent-500) / 0.18); }
+      html[data-theme='esencia'] .border-slate-700 { border-color: rgb(var(--accent-500) / 0.3); }
+      html[data-theme='esencia'] body::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: -1;
+        background-image:
+          radial-gradient(1.2px 1.2px at 12% 18%, rgba(249,218,152,.9) 50%, transparent 51%),
+          radial-gradient(1px 1px at 78% 12%, rgba(255,255,255,.8) 50%, transparent 51%),
+          radial-gradient(1.4px 1.4px at 88% 62%, rgba(249,218,152,.8) 50%, transparent 51%),
+          radial-gradient(1px 1px at 30% 72%, rgba(255,255,255,.7) 50%, transparent 51%),
+          radial-gradient(1.2px 1.2px at 55% 40%, rgba(249,218,152,.7) 50%, transparent 51%),
+          radial-gradient(1px 1px at 6% 88%, rgba(255,255,255,.7) 50%, transparent 51%),
+          radial-gradient(1.2px 1.2px at 64% 90%, rgba(249,218,152,.8) 50%, transparent 51%);
+        animation: starfield 5s ease-in-out infinite alternate;
+      }
+      @keyframes starfield { from { opacity: 0.45; } to { opacity: 1; } }
+
+      /* Logo del negocio junto a su nombre */
+      .brand-logo { border-radius: var(--logo-radius); box-shadow: var(--logo-ring); }
+
+      /* Adorno de destello bajo el título (solo temas con "ornament") */
+      .ornament { display: none; align-items: center; justify-content: center; gap: 0.75rem; margin-top: 1.5rem; }
+      html[data-ornament='true'] .ornament { display: flex; }
+      .ornament::before, .ornament::after {
+        content: '';
+        height: 1px;
+        width: 4.5rem;
+        background: linear-gradient(90deg, transparent, rgb(var(--accent-700)));
+      }
+      .ornament::after { background: linear-gradient(270deg, transparent, rgb(var(--accent-700))); }
+      .ornament svg { width: 0.9rem; height: 0.9rem; fill: rgb(var(--accent-500)); }
 
       /* Títulos principales: la letra y el grosor los define el tema.
          Solo la barbería los pone en mayúsculas, como cartel de disco. */
@@ -156,8 +214,11 @@
       .sticker {
         border: var(--sticker-border);
         box-shadow: var(--sticker-shadow);
-        transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease;
+        transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease, filter 0.15s ease;
+        /* Degradado del botón (spa y esencia); en los demás temas no se aplica */
+        background-image: var(--btn-gradient);
       }
+      .sticker:hover:not(:disabled) { filter: var(--btn-hover); }
       .sticker:active:not(:disabled) {
         transform: var(--sticker-press);
         box-shadow: var(--sticker-shadow-down);
@@ -232,6 +293,27 @@
       }
       @keyframes vinyl-spin { to { transform: rotate(360deg); } }
 
+      /* Estudios: el logo como protagonista, con halo de luz y estrellas */
+      .logo-art { position: relative; width: 15rem; height: 15rem; }
+      .logo-art::before {
+        content: '';
+        position: absolute;
+        inset: -1.25rem;
+        border-radius: 9999px;
+        background: var(--art-1);
+        opacity: 0.28;
+        filter: blur(40px);
+      }
+      .logo-art img {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 2rem;
+        box-shadow: 0 10px 40px -12px rgb(var(--accent-500) / 0.45);
+      }
+      .logo-art-stars { position: absolute; inset: -14px; width: calc(100% + 28px); height: calc(100% + 28px); overflow: visible; z-index: 2; pointer-events: none; }
+
       /* Spa: ondas de agua que respiran lentamente */
       .hero-art { width: 15rem; height: 15rem; }
       .hero-art svg { width: 100%; height: 100%; overflow: visible; }
@@ -267,7 +349,7 @@
         animation: ticker-move 30s linear infinite;
       }
       .ticker-item {
-        font-family: var(--font-display);
+        font-family: var(--font-ticker);
         font-style: var(--ticker-style);
         letter-spacing: var(--ticker-tracking);
         font-size: var(--ticker-size);
@@ -277,7 +359,7 @@
 
       /* Respeta a quien prefiere menos movimiento */
       @media (prefers-reduced-motion: reduce) {
-        .vinyl, .ticker-track, .ripple-ring, .twinkle { animation: none; }
+        .vinyl, .ticker-track, .ripple-ring, .twinkle, html[data-theme='esencia'] body::after { animation: none; }
       }
     </style>
   </head>

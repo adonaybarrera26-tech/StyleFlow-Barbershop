@@ -48,14 +48,21 @@ const Home: React.FC = () => {
   return (
     <div className="flex flex-col items-center text-center py-8 md:py-12">
       {/* Ilustración de la portada: cada giro tiene la suya */}
-      <HeroArt kind={hero} icon={CategoryIcon} category={business.category} />
+      <HeroArt kind={hero} icon={CategoryIcon} category={business.category} logoUrl={business.logoUrl} />
 
       <h1 className="mt-14 text-6xl md:text-8xl leading-[var(--h-leading)] text-white max-w-2xl">
         {business.name}
       </h1>
 
+      {/* Adorno de destello: solo lo muestran los temas que lo piden (spa y esencia) */}
+      <div className="ornament" aria-hidden="true">
+        <svg viewBox="-12 -12 24 24">
+          <path d="M0 -11 Q2.2 -2.2 11 0 Q2.2 2.2 0 11 Q-2.2 2.2 -11 0 Q-2.2 -2.2 0 -11 Z" />
+        </svg>
+      </div>
+
       {business.tagline && (
-        <p className="mt-6 text-lg md:text-xl text-slate-300 max-w-md leading-relaxed">
+        <p className="lead-text mt-6 text-lg md:text-xl text-slate-300 max-w-md leading-relaxed">
           {business.tagline}
         </p>
       )}
