@@ -167,12 +167,12 @@ export const supabaseRequest = async <T = any>(path: string, options: RequestOpt
   return data as T;
 };
 
-// ¿La persona que inició sesión está en la lista de administradores?
-export const checkIsAdmin = async (): Promise<boolean> => {
+// ¿La persona que inició sesión es administradora de ESTE negocio?
+export const checkIsAdmin = async (businessId: string): Promise<boolean> => {
   try {
-    const result = await supabaseRequest<boolean>('/rest/v1/rpc/is_admin', {
+    const result = await supabaseRequest<boolean>('/rest/v1/rpc/is_business_admin', {
       method: 'POST',
-      body: {},
+      body: { p_business: businessId },
       asAdmin: true
     });
     return result === true;

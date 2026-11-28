@@ -2,8 +2,8 @@ import React, { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle2, MapPin, Calendar, Clock, Home, Navigation, MessageCircle } from 'lucide-react';
 import { Booking } from '../../types';
-import { SHOP_INFO } from '../../constants';
-import { buildWhatsAppLink, formatMXN, formatTime } from '../../services/format';
+import { useBusiness } from '../../services/BusinessContext';
+import { buildWhatsAppLink, buildMapsLink, formatMXN, formatTime } from '../../services/format';
 
 type SuccessState = Partial<Booking> & {
   formattedDate: string;
@@ -13,25 +13,26 @@ type SuccessState = Partial<Booking> & {
 const SuccessPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { business, path } = useBusiness();
   const bookingData = location.state as SuccessState;
 
   // Si se entra directo a esta página sin datos, regresar al inicio
   useEffect(() => {
     if (!bookingData) {
-      navigate('/');
+      navigate(path('/'));
     }
-  }, [bookingData, navigate]);
+  }, [bookingData, navigate, path]);
 
   if (!bookingData) return null;
 
-  const address = SHOP_INFO.address;
+  const address = business.address;
   const mapQuery = encodeURIComponent(address);
-  const mapLink = `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
+  const mapLink = buildMapsLink(business);
   const mapEmbed = `https://maps.google.com/maps?q=${mapQuery}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
 
   const timeText = bookingData.timeSlot ? formatTime(bookingData.timeSlot) : '';
   const whatsappMessage =
-    `Hola, soy ${bookingData.customerName}. Acabo de reservar una cita en ${SHOP_INFO.name}:\n` +
+    `Hola, soy ${bookingData.customerName}. Acabo de reservar una cita en ${business.name}:\n` +
     `• Fecha: ${bookingData.formattedDate}\n` +
     `• Hora: ${timeText}\n` +
     `• Servicios: ${bookingData.servicesText || ''}\n` +
@@ -52,7 +53,7 @@ const SuccessPage: React.FC = () => {
         <div className="pt-14 pb-8 px-8 text-center space-y-6">
             <div>
                 <h2 className="text-2xl font-black text-white">¡Tu cita está reservada!</h2>
-                <p className="text-slate-400 text-sm mt-2">Comprobante de cita en {SHOP_INFO.name}</p>
+                <p className="text-slate-400 text-sm mt-2">Comprobante de cita en {business.name}</p>
                 <span className="stamp mt-4">Reservado</span>
             </div>
 
@@ -74,7 +75,7 @@ const SuccessPage: React.FC = () => {
 
             {/* Confirmar por WhatsApp */}
             <a
-                href={buildWhatsAppLink(whatsappMessage)}
+                href={buildWhatsAppLink(business, whatsappMessage)}
                 target="_blank"
                 rel="noreferrer"
                 className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
@@ -88,7 +89,7 @@ const SuccessPage: React.FC = () => {
                 <div className="flex items-start gap-3 text-left bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
                     <MapPin className="text-red-500 shrink-0 mt-1" size={20} />
                     <div>
-                        <h4 className="text-white font-bold text-sm mb-1">Dirección de la barbería:</h4>
+                        <h4 className="text-white font-bold text-sm mb-1">Dirección:</h4>
                         <p className="text-slate-300 text-sm leading-relaxed">{address}</p>
                     </div>
                 </div>
@@ -129,7 +130,7 @@ const SuccessPage: React.FC = () => {
                     Cómo llegar
                 </a>
                 <button
-                    onClick={() => navigate('/')}
+                    onClick={() => navigate(path('/'))}
                     className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 text-sm"
                 >
                     <Home size={18} />
@@ -138,7 +139,7 @@ const SuccessPage: React.FC = () => {
             </div>
 
             <p className="text-slate-500 text-xs">
-                ¿Necesitas cancelar? Entra a <Link to="/mis-reservas" className="text-amber-500 underline">Mis reservas</Link> con tu celular.
+                ¿Necesitas cancelar? Entra a <Link to={path('/mis-reservas')} className="text-amber-500 underline">Mis reservas</Link> con tu celular.
             </p>
         </div>
 

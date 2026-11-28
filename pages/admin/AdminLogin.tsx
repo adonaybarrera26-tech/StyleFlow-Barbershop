@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Lock, Loader2 } from 'lucide-react';
 import { loginAdmin } from '../../services/dataService';
 import { isSupabaseEnabled } from '../../services/supabase';
+import { useBusiness } from '../../services/BusinessContext';
 
 const AdminLogin: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -10,6 +11,7 @@ const AdminLogin: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { business, path } = useBusiness();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,9 +19,9 @@ const AdminLogin: React.FC = () => {
     setLoading(true);
 
     try {
-      const success = await loginAdmin(username, password);
+      const success = await loginAdmin(business, username, password);
       if (success) {
-        navigate('/admin/dashboard');
+        navigate(path('/admin/dashboard'));
       } else {
         setError(isSupabaseEnabled() ? 'Correo o contraseña incorrectos.' : 'Usuario o contraseña incorrectos.');
       }
@@ -38,7 +40,8 @@ const AdminLogin: React.FC = () => {
             <Lock size={36} />
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-center text-white mb-8">Acceso de administrador</h2>
+        <h2 className="text-2xl font-bold text-center text-white">Acceso de administrador</h2>
+        <p className="text-center text-slate-400 mt-2 mb-8">{business.name}</p>
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>

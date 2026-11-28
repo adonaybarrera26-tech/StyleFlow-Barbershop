@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Scissors, MessageCircle, ShieldCheck, Phone, MapPin, Instagram, Facebook } from 'lucide-react';
+import { MessageCircle, ShieldCheck, Phone, MapPin, Instagram, Facebook } from 'lucide-react';
 import { useLanguage } from '../services/LanguageContext';
+import { useBusiness } from '../services/BusinessContext';
+import { getCategory } from '../services/categories';
 import { buildWhatsAppLink, buildCallLink, buildMapsLink, formatMXN } from '../services/format';
-import { SHOP_INFO, PROMOTIONS } from '../constants';
 
 // lucide-react no trae el logo de TikTok, así que se dibuja aquí
 const TikTokIcon: React.FC<{ size?: number }> = ({ size = 24 }) => (
@@ -31,42 +32,46 @@ interface QuickAction {
 
 const Home: React.FC = () => {
   const { t } = useLanguage();
+  const { business, path } = useBusiness();
+  const { icon: CategoryIcon } = getCategory(business.category);
 
-  // Botones de acción rápida. Los que no tienen link en constants.ts no se muestran.
+  // Botones de acción rápida. Los que el negocio no tiene capturados no se muestran.
   const quickActions: QuickAction[] = [
-    { label: 'Llamar', href: buildCallLink(), icon: <Phone size={24} />, external: false },
-    { label: 'Cómo llegar', href: buildMapsLink(), icon: <MapPin size={24} />, external: true },
-    { label: 'Instagram', href: SHOP_INFO.instagramUrl, icon: <Instagram size={24} />, external: true },
-    { label: 'Facebook', href: SHOP_INFO.facebookUrl, icon: <Facebook size={24} />, external: true },
-    { label: 'TikTok', href: SHOP_INFO.tiktokUrl, icon: <TikTokIcon size={24} />, external: true },
+    { label: 'Llamar', href: buildCallLink(business), icon: <Phone size={24} />, external: false },
+    { label: 'Cómo llegar', href: buildMapsLink(business), icon: <MapPin size={24} />, external: true },
+    { label: 'Instagram', href: business.instagramUrl, icon: <Instagram size={24} />, external: true },
+    { label: 'Facebook', href: business.facebookUrl, icon: <Facebook size={24} />, external: true },
+    { label: 'TikTok', href: business.tiktokUrl, icon: <TikTokIcon size={24} />, external: true },
   ].filter(action => action.href);
 
   return (
     <div className="flex flex-col items-center text-center py-8 md:py-12">
-      {/* Disco de vinilo con tijeras en la etiqueta */}
+      {/* Disco de vinilo con el ícono del giro en la etiqueta */}
       <div className="vinyl" aria-hidden="true">
         <div className="vinyl-label">
-          <Scissors size={34} strokeWidth={2.5} color="#0B0A08" style={{ transform: 'translateY(-14px)' }} />
+          <CategoryIcon size={34} strokeWidth={2.5} color="#0B0A08" style={{ transform: 'translateY(-14px)' }} />
         </div>
       </div>
 
       <h1 className="mt-14 text-6xl md:text-8xl leading-[0.95] text-white max-w-2xl">
-        {t('heroTitle')}
+        {business.name}
       </h1>
 
-      <p className="mt-6 text-lg md:text-xl text-slate-300 max-w-md leading-relaxed">
-        {t('heroSubtitle')}
-      </p>
+      {business.tagline && (
+        <p className="mt-6 text-lg md:text-xl text-slate-300 max-w-md leading-relaxed">
+          {business.tagline}
+        </p>
+      )}
 
       <Link
-        to="/booking"
+        to={path('/booking')}
         className="sticker mt-10 inline-flex items-center justify-center bg-amber-500 text-black font-display uppercase tracking-wider text-2xl px-10 py-4 rounded-xl hover:bg-amber-400"
       >
         Reserva tu cita
       </Link>
 
       <a
-        href={buildWhatsAppLink('Hola, me gustaría tener más información sobre sus servicios.')}
+        href={buildWhatsAppLink(business, 'Hola, me gustaría tener más información sobre sus servicios.')}
         target="_blank"
         rel="noreferrer"
         className="mt-8 inline-flex items-center gap-2 text-slate-300 font-semibold underline underline-offset-4 decoration-amber-500 decoration-2 hover:text-white"
@@ -94,14 +99,14 @@ const Home: React.FC = () => {
         </ul>
         <p className="mt-4 inline-flex items-center justify-center gap-1.5 text-sm text-slate-400">
           <MapPin size={14} aria-hidden="true" />
-          {SHOP_INFO.address}
+          {business.address}
         </p>
       </nav>
 
       {/* Detalles del servicio */}
-      {SHOP_INFO.perks.length > 0 && (
+      {business.perks.length > 0 && (
         <ul className="mt-8 flex max-w-md flex-wrap justify-center gap-2">
-          {SHOP_INFO.perks.map(perk => (
+          {business.perks.map(perk => (
             <li
               key={perk}
               className="rounded-lg border border-amber-500/70 px-3 py-1 text-sm font-semibold text-amber-300"
@@ -113,7 +118,7 @@ const Home: React.FC = () => {
       )}
 
       {/* Promociones: se piden por WhatsApp */}
-      {PROMOTIONS.length > 0 && (
+      {business.promotions.length > 0 && (
         <section className="mt-16 w-full max-w-lg" aria-labelledby="promociones-titulo">
           <h2 id="promociones-titulo" className="text-5xl text-white">
             Promociones
@@ -121,7 +126,7 @@ const Home: React.FC = () => {
           <p className="mt-2 text-slate-400">Pide la tuya por WhatsApp.</p>
 
           <ul className="mt-6 space-y-4 text-left">
-            {PROMOTIONS.map(promo => (
+            {business.promotions.map(promo => (
               <li key={promo.id} className="rounded-lg border-2 border-slate-700 bg-slate-900 p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -136,6 +141,7 @@ const Home: React.FC = () => {
                 </div>
                 <a
                   href={buildWhatsAppLink(
+                    business,
                     `Hola, quiero la promoción "${promo.title}" (${formatMXN(promo.promoPrice)}). ¿Qué horarios tienen?`
                   )}
                   target="_blank"
@@ -152,7 +158,7 @@ const Home: React.FC = () => {
       )}
 
       <Link
-        to="/admin"
+        to={path('/admin')}
         className="mt-16 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-300"
       >
         <ShieldCheck size={16} />
