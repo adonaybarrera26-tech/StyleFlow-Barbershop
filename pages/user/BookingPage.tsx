@@ -14,6 +14,26 @@ import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Users
 // Pasos de la reserva: sucursal (solo si hay varias) -> servicios -> profesional (solo si el negocio tiene) -> fecha y hora -> datos
 type Step = 'location' | 'services' | 'pro' | 'time' | 'details';
 
+// Una fila del resumen de la cita; si se puede cambiar, lleva su botón "Cambiar"
+const SummaryRow: React.FC<{ label: string; value: string; onChange?: () => void }> = ({ label, value, onChange }) => (
+  <div className="flex justify-between text-sm gap-4">
+    <span className="text-slate-400 shrink-0">
+      {label}:
+      {onChange && (
+        <button
+          type="button"
+          onClick={onChange}
+          aria-label={`Cambiar ${label.toLowerCase()}`}
+          className="ml-2 text-xs font-semibold text-amber-500 underline underline-offset-2 hover:text-amber-400"
+        >
+          Cambiar
+        </button>
+      )}
+    </span>
+    <span className="font-medium text-slate-200 text-right">{value}</span>
+  </div>
+);
+
 const BookingPage: React.FC = () => {
   const navigate = useNavigate();
   const routeState = useLocation().state as { reschedule?: RescheduleState; prefill?: { customerName?: string; phone?: string } } | null;
@@ -191,6 +211,12 @@ const BookingPage: React.FC = () => {
         setSelectedTime('');
     }
   }, [selectedDate, allBookings, selectedTime, settings, loadingData, selectedServices, selectedLocation, professionals, proChoice]);
+
+  // Desde el resumen: volver a un paso para cambiar algo (lo demás se conserva)
+  const changeStep = (target: Step) => {
+    setFormError('');
+    setStep(target);
+  };
 
   // Con quién quedó la cita: el profesional elegido o, con "cualquiera", el que tiene lugar a esa hora
   const assignedPro: Professional | null = selectedPro ?? availableSlots.find(slot => slot.time === selectedTime)?.pro ?? null;
@@ -569,7 +595,11 @@ const BookingPage: React.FC = () => {
                 </div>
                 <button
                     disabled={selectedServices.length === 0}
-                    onClick={() => { setFormError(''); goNext('services'); }}
+                    onClick={() => {
+                        setFormError('');
+                        // Si ya eligió con quién (y volvió a cambiar servicios), no se le pregunta otra vez
+                        setStep(hasPros && (selectedPro || anyPro) ? 'time' : flow[flow.indexOf('services') + 1]);
+                    }}
                     className="sticker bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400 flex items-center gap-2"
                 >
                     Continuar
@@ -839,29 +869,13 @@ const BookingPage: React.FC = () => {
         <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
              <h3 className="font-bold text-white mb-2">Resumen de tu cita</h3>
              {selectedLocation && (
-                 <div className="flex justify-between text-sm gap-4">
-                     <span className="text-slate-400">Sucursal:</span>
-                     <span className="font-medium text-slate-200 text-right">{selectedLocation.name}</span>
-                 </div>
+                 <SummaryRow label="Sucursal" value={selectedLocation.name} onChange={needsLocation ? () => changeStep('location') : undefined} />
              )}
              {assignedPro && (
-                 <div className="flex justify-between text-sm gap-4">
-                     <span className="text-slate-400">Con:</span>
-                     <span className="font-medium text-slate-200 text-right">{assignedPro.name}</span>
-                 </div>
+                 <SummaryRow label="Con" value={assignedPro.name} onChange={hasPros ? () => changeStep('pro') : undefined} />
              )}
-             <div className="flex justify-between text-sm gap-4">
-                 <span className="text-slate-400">Servicios:</span>
-                 <span className="font-medium text-slate-200 text-right">{selectedServices.map(s => s.title).join(', ')}</span>
-             </div>
-             <div className="flex justify-between text-sm">
-                 <span className="text-slate-400">Fecha:</span>
-                 <span className="font-medium text-slate-200">{formatDateShort(selectedDate)}</span>
-             </div>
-             <div className="flex justify-between text-sm">
-                 <span className="text-slate-400">Hora:</span>
-                 <span className="font-medium text-slate-200">{formatTime(selectedTime)}</span>
-             </div>
+             <SummaryRow label="Servicios" value={selectedServices.map(s => s.title).join(', ')} onChange={() => changeStep('services')} />
+             <SummaryRow label="Fecha y hora" value={`${formatDateShort(selectedDate)}, ${formatTime(selectedTime)}`} onChange={() => changeStep('time')} />
              <div className="flex justify-between text-sm">
                  <span className="text-slate-400">Duración:</span>
                  <span className="font-medium text-slate-200">{totalDuration} min</span>

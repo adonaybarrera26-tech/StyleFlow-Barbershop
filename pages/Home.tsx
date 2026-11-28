@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircle, ShieldCheck, Phone, MapPin, Instagram, Facebook } from 'lucide-react';
+import { MessageCircle, ShieldCheck, Phone, MapPin, Instagram, Facebook, Clock, Calendar } from 'lucide-react';
 import { useLanguage } from '../services/LanguageContext';
 import { useBusiness } from '../services/BusinessContext';
 import { getCategory } from '../services/categories';
 import HeroArt from '../components/HeroArt';
 import { buildWhatsAppLink, buildCallLink, buildMapsLink, formatMXN } from '../services/format';
+import { getBusinessSettings } from '../services/dataService';
+import { effectiveSchedule } from '../services/slots';
+import { describeHours } from '../services/hours';
+import { BusinessLocation, BusinessSettings } from '../types';
 
 // lucide-react no trae el logo de TikTok, así que se dibuja aquí
 const TikTokIcon: React.FC<{ size?: number }> = ({ size = 24 }) => (
@@ -37,6 +41,30 @@ const Home: React.FC = () => {
   const { icon: CategoryIcon, hero } = getCategory(business.category);
   const hasLocations = locations.length > 0;
 
+  // Horario de cada sucursal (o del negocio): lo que la sucursal no define usa lo general
+  const [settings, setSettings] = useState<BusinessSettings | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getBusinessSettings(business.id)
+      .then(s => { if (!cancelled) setSettings(s); })
+      .catch(() => { /* sin horario en el inicio; reservar sigue funcionando */ });
+    return () => { cancelled = true; };
+  }, [business.id]);
+
+  const hoursOf = (location: BusinessLocation | null) =>
+    settings ? describeHours(effectiveSchedule(location, settings)) : null;
+
+  // La barra fija "Agendar cita" aparece cuando el botón grande de la portada ya salió de la pantalla
+  const heroCta = useRef<HTMLAnchorElement>(null);
+  const [showBar, setShowBar] = useState(false);
+  useEffect(() => {
+    const el = heroCta.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setShowBar(!entry.isIntersecting), { threshold: 0 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   // Botones de acción rápida. Los que el negocio no tiene capturados no se muestran.
   const quickActions: QuickAction[] = [
     { label: 'Llamar', href: buildCallLink(business), icon: <Phone size={24} />, external: false },
@@ -50,7 +78,7 @@ const Home: React.FC = () => {
   ].filter(action => action.href);
 
   return (
-    <div className="flex flex-col items-center text-center py-8 md:py-12">
+    <div className="flex flex-col items-center text-center pt-8 pb-28 md:py-12">
       {/* Ilustración de la portada: cada giro tiene la suya */}
       <HeroArt kind={hero} icon={CategoryIcon} category={business.category} logoUrl={business.logoUrl} />
 
@@ -72,6 +100,7 @@ const Home: React.FC = () => {
       )}
 
       <Link
+        ref={heroCta}
         to={path('/booking')}
         className="sticker mt-10 inline-flex items-center justify-center bg-amber-500 text-black font-display uppercase tracking-wider text-2xl px-10 py-4 rounded-xl hover:bg-amber-400"
       >
@@ -119,16 +148,34 @@ const Home: React.FC = () => {
                   <span>
                     <span className="block text-sm font-semibold text-white">{l.name}</span>
                     {l.address && <span className="block text-xs text-slate-400">{l.address}</span>}
+                    {hoursOf(l) && (
+                      <span className="mt-1 flex items-center gap-1 text-xs text-slate-300">
+                        <Clock size={12} className="shrink-0 text-amber-500" aria-hidden="true" />
+                        {hoursOf(l)!.line}
+                      </span>
+                    )}
+                    {hoursOf(l)?.breakLine && <span className="block text-xs text-slate-500">{hoursOf(l)!.breakLine}</span>}
                   </span>
                 </a>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="mt-4 inline-flex items-center justify-center gap-1.5 text-sm text-slate-400">
-            <MapPin size={14} aria-hidden="true" />
-            {hasLocations && locations[0].address ? locations[0].address : business.address}
-          </p>
+          <div className="mt-4 space-y-1 text-sm text-slate-400">
+            <p className="inline-flex items-center justify-center gap-1.5">
+              <MapPin size={14} aria-hidden="true" />
+              {hasLocations && locations[0].address ? locations[0].address : business.address}
+            </p>
+            {hoursOf(locations[0] ?? null) && (
+              <p className="flex items-center justify-center gap-1.5 text-slate-300">
+                <Clock size={14} className="text-amber-500" aria-hidden="true" />
+                {hoursOf(locations[0] ?? null)!.line}
+              </p>
+            )}
+            {hoursOf(locations[0] ?? null)?.breakLine && (
+              <p className="text-xs text-slate-500">{hoursOf(locations[0] ?? null)!.breakLine}</p>
+            )}
+          </div>
         )}
       </nav>
 
@@ -184,6 +231,19 @@ const Home: React.FC = () => {
             ))}
           </ul>
         </section>
+      )}
+
+      {/* Barra fija (solo celular): arriba de la navegación de abajo */}
+      {showBar && (
+        <div className="fixed bottom-[70px] left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/95 p-3 backdrop-blur md:hidden">
+          <Link
+            to={path('/booking')}
+            className="sticker mx-auto flex max-w-md items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 font-display text-xl uppercase tracking-wider text-black hover:bg-amber-400"
+          >
+            <Calendar size={20} aria-hidden="true" />
+            Agendar cita
+          </Link>
+        </div>
       )}
 
       <Link
