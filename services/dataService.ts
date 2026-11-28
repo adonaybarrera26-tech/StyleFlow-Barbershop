@@ -104,7 +104,10 @@ const mapBusiness = (row: any): Business => ({
   facebookUrl: row.facebook_url || '',
   tiktokUrl: row.tiktok_url || '',
   perks: Array.isArray(row.perks) ? row.perks.map(String) : [],
-  promotions: Array.isArray(row.promotions) ? row.promotions.map(mapPromotion) : []
+  promotions: Array.isArray(row.promotions) ? row.promotions.map(mapPromotion) : [],
+  theme: row.theme || '',
+  brandColor: row.brand_color || '',
+  logoUrl: row.logo_url || ''
 });
 
 // Cambios (PATCH / DELETE): si no se modificó ninguna fila, algo falló (por ejemplo, falta de permisos)

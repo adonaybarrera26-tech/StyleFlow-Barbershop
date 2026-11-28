@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { Outlet, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Business } from '../types';
 import { getBusiness } from '../services/dataService';
 import { BusinessProvider } from '../services/BusinessContext';
+import { applyTheme, DEFAULT_LOOK } from '../services/themes';
 import Layout from './Layout';
 import NotFound from '../pages/NotFound';
 
@@ -34,6 +35,16 @@ const BusinessShell: React.FC = () => {
       cancelled = true;
     };
   }, [slug, attempt]);
+
+  // Colores, letra y formas del negocio según su giro; sin negocio (cargando o con error) se ve el look base
+  useLayoutEffect(() => {
+    applyTheme(state.status === 'ready' ? state.business : DEFAULT_LOOK);
+  }, [state]);
+
+  // Al salir de un negocio se regresa al look base
+  useLayoutEffect(() => () => {
+    applyTheme(DEFAULT_LOOK);
+  }, []);
 
   // El título de la pestaña lleva el nombre del negocio
   useEffect(() => {

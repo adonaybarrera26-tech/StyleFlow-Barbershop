@@ -371,7 +371,7 @@ const AdminDashboard: React.FC = () => {
     <div className="space-y-6 pb-20 relative">
       {/* Aviso emergente */}
       {notification && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
                   <button
                       onClick={() => setNotification(null)}
@@ -393,7 +393,7 @@ const AdminDashboard: React.FC = () => {
 
                       <button
                           onClick={() => setNotification(null)}
-                          className={`mt-2 w-full py-3 rounded-xl font-bold text-white transition-all ${
+                          className={`mt-2 w-full py-3 rounded-xl font-bold text-paper transition-all ${
                               notification.type === 'success' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
                           }`}
                       >
@@ -406,7 +406,7 @@ const AdminDashboard: React.FC = () => {
 
       {/* Ventana para confirmar la eliminación de un servicio */}
       {serviceToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
                   <button
                       onClick={() => setServiceToDelete(null)}
@@ -433,7 +433,7 @@ const AdminDashboard: React.FC = () => {
                           </button>
                           <button
                               onClick={confirmDeleteService}
-                              className="flex-1 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-all"
+                              className="flex-1 py-3 rounded-xl font-bold text-paper bg-red-600 hover:bg-red-700 transition-all"
                           >
                               Eliminar
                           </button>
@@ -445,7 +445,7 @@ const AdminDashboard: React.FC = () => {
 
       {/* Aviso de cita cancelada, con botón para avisarle al cliente por WhatsApp */}
       {cancelledBooking && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
                   <button
                       onClick={() => setCancelledBooking(null)}
@@ -469,7 +469,7 @@ const AdminDashboard: React.FC = () => {
                           target="_blank"
                           rel="noreferrer"
                           onClick={() => setCancelledBooking(null)}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
+                          className="w-full bg-green-600 hover:bg-green-700 text-paper py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
                       >
                           <MessageCircle size={20} />
                           Avisar por WhatsApp
@@ -487,7 +487,7 @@ const AdminDashboard: React.FC = () => {
 
       {/* Ventana para confirmar la cancelación de una cita */}
       {bookingToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
                   <button
                       onClick={() => setBookingToDelete(null)}
@@ -515,7 +515,7 @@ const AdminDashboard: React.FC = () => {
                           </button>
                           <button
                               onClick={confirmDeleteBooking}
-                              className="flex-1 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-all"
+                              className="flex-1 py-3 rounded-xl font-bold text-paper bg-red-600 hover:bg-red-700 transition-all"
                           >
                               Cancelar cita
                           </button>
@@ -621,7 +621,7 @@ const AdminDashboard: React.FC = () => {
                   </button>
                   <button
                     onClick={exportExcel}
-                    className="flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors shadow-lg shadow-green-900/20"
+                    className="flex items-center gap-2 bg-green-700 text-paper px-4 py-2 rounded-lg hover:bg-green-600 transition-colors shadow-lg shadow-green-900/20"
                   >
                     <Download size={18} />
                     Exportar a Excel
@@ -927,9 +927,9 @@ const AdminDashboard: React.FC = () => {
                   <button
                     onClick={handleSaveSettings}
                     disabled={savingSettings}
-                    className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-green-900/20 hover:bg-green-700 transition-all disabled:opacity-50"
+                    className="flex items-center gap-2 bg-green-600 text-paper px-6 py-3 rounded-xl font-bold shadow-lg shadow-green-900/20 hover:bg-green-700 transition-all disabled:opacity-50"
                   >
-                      {savingSettings ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Save size={20} />}
+                      {savingSettings ? <div className="w-5 h-5 border-2 border-paper/30 border-t-paper rounded-full animate-spin"></div> : <Save size={20} />}
                       Guardar cambios
                   </button>
               </div>
@@ -940,7 +940,7 @@ const AdminDashboard: React.FC = () => {
 };
 
 const CheckIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-white"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-paper"><polyline points="20 6 9 17 4 12"></polyline></svg>
 );
 
 export default AdminDashboard;

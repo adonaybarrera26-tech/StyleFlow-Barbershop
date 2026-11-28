@@ -92,7 +92,7 @@ const AboutProject: React.FC = () => {
           href={buildWhatsAppLink(business, 'Hola, me gustaría tener más información sobre sus servicios.')}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold transition-colors shadow-lg shadow-green-900/20"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-paper font-bold transition-colors shadow-lg shadow-green-900/20"
         >
           <MessageCircle size={20} />
           Escríbenos por WhatsApp

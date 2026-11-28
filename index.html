@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es-MX" dir="ltr">
+<html lang="es-MX" dir="ltr" data-theme="barberia" data-mode="dark" data-caps="true">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,48 +8,33 @@
     <meta name="description" content="Reserva tu cita en línea: elige tu servicio, tu fecha y tu hora desde el celular." />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Paleta "oro y negro 90s": se reemplazan los grises azulados (slate) por negros cálidos
-      // y el ámbar (amber) por oro, así toda la app cambia de look sin tocar cada pantalla.
+      // Los colores, las letras y las esquinas NO están fijos: salen de variables CSS que cada
+      // negocio cambia según su giro (ver services/themes.ts). Aquí solo se conectan a Tailwind:
+      //   slate = fondos y textos      amber = color principal del negocio
+      //   white = títulos (la "tinta")  black = texto sobre el color principal
+      //   paper = blanco fijo (texto sobre botones verdes y rojos)   scrim = fondo oscuro de ventanas
+      const v = name => `rgb(var(--${name}) / <alpha-value>)`;
+      const ramp = (prefix, steps) => Object.fromEntries(steps.map(step => [step, v(`${prefix}-${step}`)]));
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              slate: {
-                50: '#FAF4E3',
-                100: '#F1E8D0',
-                200: '#E4DBC4',
-                300: '#CFC6B0',
-                400: '#A89F8A',
-                500: '#857A66',
-                600: '#5C5242',
-                700: '#3A3326',
-                800: '#221E17',
-                900: '#15130F',
-                950: '#0B0A08'
-              },
-              amber: {
-                50: '#FFF8DB',
-                100: '#FFEFB0',
-                200: '#FFE27A',
-                300: '#FFD43B',
-                400: '#FFCC1F',
-                500: '#F2B705',
-                600: '#F2B705',
-                700: '#D99A00',
-                800: '#A87A00',
-                900: '#5A4300'
-              }
+              slate: ramp('slate', [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]),
+              amber: ramp('accent', [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]),
+              white: v('ink'),
+              black: v('on-accent'),
+              paper: '#FFFFFF',
+              scrim: v('scrim')
             },
             fontFamily: {
-              sans: ['Archivo', 'system-ui', 'sans-serif'],
-              display: ['Anton', 'Impact', 'sans-serif']
+              sans: ['var(--font-body)'],
+              display: ['var(--font-display)']
             },
-            // Esquinas más cuadradas: look de cartel y sticker, no de tarjeta redondeada
             borderRadius: {
-              lg: '0.25rem',
-              xl: '0.25rem',
-              '2xl': '0.375rem',
-              '3xl': '0.375rem'
+              lg: 'var(--r-lg)',
+              xl: 'var(--r-xl)',
+              '2xl': 'var(--r-2xl)',
+              '3xl': 'var(--r-3xl)'
             }
           }
         }
@@ -59,77 +44,162 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-      body {
-        font-family: 'Archivo', system-ui, sans-serif;
-        background-color: #0B0A08;
-        color: #F1E8D0;
+      /* Valores de la barbería: se usan al abrir la página y mientras carga el negocio.
+         Después, services/themes.ts los reemplaza con los del giro del negocio. */
+      :root {
+      --ink: 255 255 255;
+      --scrim: 0 0 0;
+      --on-accent: 11 10 8;
+      --font-display: 'Anton', Impact, sans-serif;
+      --font-body: 'Archivo', system-ui, sans-serif;
+      --h-weight: 400;
+      --h-leading: 0.95;
+      --r-lg: 0.25rem;
+      --r-xl: 0.25rem;
+      --r-2xl: 0.375rem;
+      --r-3xl: 0.375rem;
+      --sticker-border: 2px solid rgb(var(--slate-950));
+      --sticker-shadow: 4px 4px 0 0 rgb(var(--slate-100));
+      --sticker-shadow-down: 1px 1px 0 0 rgb(var(--slate-100));
+      --sticker-press: translate(3px, 3px);
+      --pop-accent: 4px 4px 0 0 rgb(var(--accent-500));
+      --pop-ink: 4px 4px 0 0 rgb(var(--slate-100));
+      --ticker-bg: rgb(var(--accent-500));
+      --ticker-fg: rgb(var(--on-accent));
+      --ticker-border: 3px solid rgb(var(--slate-950));
+      --ticker-style: normal;
+      --ticker-size: 0.95rem;
+      --ticker-tracking: 0.08em;
+      --pole-bg: repeating-linear-gradient(-45deg, rgb(var(--accent-500)) 0 12px, rgb(var(--slate-950)) 12px 24px);
+      --grain: 0.07;
+      --stamp: 230 57 70;
+      --art-1: rgb(var(--accent-500));
+      --art-2: #0B0A08;
+      --art-3: #1D1A14;
+      --focus: 255 212 59;
+      --slate-50: 250 244 227;
+      --slate-100: 241 232 208;
+      --slate-200: 228 219 196;
+      --slate-300: 207 198 176;
+      --slate-400: 168 159 138;
+      --slate-500: 133 122 102;
+      --slate-600: 92 82 66;
+      --slate-700: 58 51 38;
+      --slate-800: 34 30 23;
+      --slate-900: 21 19 15;
+      --slate-950: 11 10 8;
+      --accent-50: 255 248 219;
+      --accent-100: 255 239 176;
+      --accent-200: 255 226 122;
+      --accent-300: 255 212 59;
+      --accent-400: 255 204 31;
+      --accent-500: 242 183 5;
+      --accent-600: 242 183 5;
+      --accent-700: 217 154 0;
+      --accent-800: 168 122 0;
+      --accent-900: 90 67 0;
       }
 
-      /* Títulos principales: letras gruesas y en mayúsculas, como cartel de disco */
+      body {
+        font-family: var(--font-body);
+        background-color: rgb(var(--slate-950));
+        color: rgb(var(--slate-100));
+      }
+
+      /* Títulos principales: la letra y el grosor los define el tema.
+         Solo la barbería los pone en mayúsculas, como cartel de disco. */
       h1, h2 {
-        font-family: 'Anton', Impact, sans-serif;
-        font-weight: 400 !important;
+        font-family: var(--font-display);
+        font-weight: var(--h-weight) !important;
+        letter-spacing: 0.01em;
+      }
+      html[data-caps='true'] h1, html[data-caps='true'] h2 {
         text-transform: uppercase;
         letter-spacing: 0.02em;
       }
+      /* Textos que piden mayúsculas en la barbería ("Reserva tu cita"): en los demás giros se ven normales */
+      html[data-caps='false'] .font-display.uppercase {
+        text-transform: none;
+        letter-spacing: 0.005em;
+      }
 
-      ::selection { background: #F2B705; color: #0B0A08; }
+      ::selection { background: rgb(var(--accent-500)); color: rgb(var(--on-accent)); }
 
       /* Contorno visible al navegar con teclado */
-      :focus-visible { outline: 3px solid #FFD43B; outline-offset: 2px; }
+      :focus-visible { outline: 3px solid rgb(var(--focus)); outline-offset: 2px; }
 
-      /* Textura de grano muy suave para que el negro no se vea plano */
+      /* Textura de grano muy suave (solo la barbería: ahí el negro se vería plano) */
       body::before {
         content: '';
         position: fixed;
         inset: 0;
         pointer-events: none;
         z-index: 60;
-        opacity: 0.07;
+        opacity: var(--grain);
         background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
       }
 
-      /* Texto negro sobre cualquier fondo dorado (botones, fechas elegidas, menú activo) */
-      .bg-amber-600, .bg-amber-600 * { color: #0B0A08 !important; }
+      /* Texto legible sobre cualquier fondo del color principal (botones, fechas elegidas, menú activo) */
+      .bg-amber-600, .bg-amber-600 * { color: rgb(var(--on-accent)) !important; }
 
-      /* Botón tipo sticker: sombra dura que "se aplasta" al presionar */
+      /* Temas claros: las tarjetas flotan con una sombra suave en lugar de un borde fuerte */
+      html[data-mode='light'] .bg-slate-900 {
+        box-shadow: 0 1px 2px rgb(var(--slate-50) / 0.06), 0 10px 26px -18px rgb(var(--slate-50) / 0.28);
+      }
+
+      /* Temas claros: rojos y verdes de texto más oscuros para que se lean sobre fondos claros */
+      html[data-mode='light'] .text-red-500, html[data-mode='light'] .text-red-400, html[data-mode='light'] .text-red-300 { color: #B42318; }
+      html[data-mode='light'] .text-green-500, html[data-mode='light'] .text-green-400 { color: #15803D; }
+
+      /* Botón principal: en la barbería es un sticker con sombra dura que "se aplasta" al presionar;
+         en los demás giros es un botón con sombra suave del color principal */
       .sticker {
-        border: 2px solid #0B0A08;
-        box-shadow: 4px 4px 0 0 #F1E8D0;
-        transition: transform 0.08s ease, box-shadow 0.08s ease;
+        border: var(--sticker-border);
+        box-shadow: var(--sticker-shadow);
+        transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease;
       }
       .sticker:active:not(:disabled) {
-        transform: translate(3px, 3px);
-        box-shadow: 1px 1px 0 0 #F1E8D0;
+        transform: var(--sticker-press);
+        box-shadow: var(--sticker-shadow-down);
       }
 
-      /* Franja de poste de barbero (oro y negro) */
-      .pole {
-        background: repeating-linear-gradient(-45deg, #F2B705 0 12px, #0B0A08 12px 24px);
-      }
+      /* Tarjeta o botón elegido: sombra dura en la barbería, sombra suave en los demás giros */
+      .pop-accent { box-shadow: var(--pop-accent); }
+      .pop-ink { box-shadow: var(--pop-ink); }
 
-      /* Sello rojo de "reservado" */
+      /* Encabezado de "cita confirmada" (en la barbería, el poste de barbero) */
+      .pole { background: var(--pole-bg); }
+
+      /* Sello de "reservado" */
       .stamp {
         display: inline-block;
-        font-family: 'Anton', Impact, sans-serif;
-        text-transform: uppercase;
+        font-family: var(--font-display);
         letter-spacing: 0.12em;
-        color: #E63946;
-        border: 3px solid #E63946;
+        color: rgb(var(--stamp));
+        border: 3px solid rgb(var(--stamp));
         padding: 0.15rem 0.7rem;
         transform: rotate(-5deg);
       }
+      html[data-caps='true'] .stamp { text-transform: uppercase; }
+      html[data-caps='false'] .stamp {
+        letter-spacing: 0.04em;
+        border-width: 2px;
+        border-radius: var(--r-xl);
+        font-style: italic;
+        padding: 0.1rem 0.9rem;
+      }
 
-      /* Disco de vinilo: el elemento principal de la portada */
+      /* ---------- Portadas (components/HeroArt.tsx) ---------- */
+
+      /* Barbería: disco de vinilo con el ícono del giro en la etiqueta */
       .vinyl {
         position: relative;
         width: 15rem;
         height: 15rem;
         border-radius: 9999px;
-        background:
-          repeating-radial-gradient(circle at center, #0B0A08 0 2px, #1D1A14 2px 3px);
-        /* Aro dorado parejo. Antes tenía una sombra desplazada (10px 10px) que giraba junto con el disco y lo hacía verse descentrado */
-        box-shadow: 0 0 0 4px #F2B705;
+        background: repeating-radial-gradient(circle at center, #0B0A08 0 2px, #1D1A14 2px 3px);
+        /* Aro parejo del color principal (una sombra desplazada giraba con el disco y lo hacía verse descentrado) */
+        box-shadow: 0 0 0 4px rgb(var(--accent-500));
         animation: vinyl-spin 10s linear infinite;
       }
       .vinyl::before {
@@ -143,7 +213,7 @@
         position: absolute;
         inset: 32%;
         border-radius: 9999px;
-        background: #F2B705;
+        background: rgb(var(--accent-500));
         display: flex;
         align-items: center;
         justify-content: center;
@@ -162,13 +232,32 @@
       }
       @keyframes vinyl-spin { to { transform: rotate(360deg); } }
 
+      /* Spa: ondas de agua que respiran lentamente */
+      .hero-art { width: 15rem; height: 15rem; }
+      .hero-art svg { width: 100%; height: 100%; overflow: visible; }
+      .ripple-ring { transform-origin: 100px 100px; animation: ripple-breathe 7s ease-in-out infinite; }
+      .ripple-ring:nth-of-type(2) { animation-delay: -1.4s; }
+      .ripple-ring:nth-of-type(3) { animation-delay: -2.8s; }
+      .ripple-ring:nth-of-type(4) { animation-delay: -4.2s; }
+      @keyframes ripple-breathe {
+        0%, 100% { transform: scale(0.97); opacity: 0.95; }
+        50% { transform: scale(1.04); opacity: 0.7; }
+      }
+
+      /* Dentista: brillitos que parpadean */
+      .twinkle { transform-box: fill-box; transform-origin: center; animation: twinkle 3.4s ease-in-out infinite; }
+      @keyframes twinkle {
+        0%, 100% { transform: scale(0.6); opacity: 0.35; }
+        50% { transform: scale(1); opacity: 1; }
+      }
+
       /* Cinta de frases que se desplaza arriba de la página */
       .ticker {
         overflow: hidden;
         white-space: nowrap;
-        background: #F2B705;
-        color: #0B0A08;
-        border-bottom: 3px solid #0B0A08;
+        background: var(--ticker-bg);
+        color: var(--ticker-fg);
+        border-bottom: var(--ticker-border);
       }
       .ticker-track {
         display: inline-flex;
@@ -178,16 +267,17 @@
         animation: ticker-move 30s linear infinite;
       }
       .ticker-item {
-        font-family: 'Anton', Impact, sans-serif;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-size: 0.95rem;
+        font-family: var(--font-display);
+        font-style: var(--ticker-style);
+        letter-spacing: var(--ticker-tracking);
+        font-size: var(--ticker-size);
       }
+      html[data-caps='true'] .ticker-item { text-transform: uppercase; }
       @keyframes ticker-move { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
       /* Respeta a quien prefiere menos movimiento */
       @media (prefers-reduced-motion: reduce) {
-        .vinyl, .ticker-track { animation: none; }
+        .vinyl, .ticker-track, .ripple-ring, .twinkle { animation: none; }
       }
     </style>
   </head>
