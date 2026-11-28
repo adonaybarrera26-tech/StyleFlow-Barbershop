@@ -134,7 +134,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="flex justify-around items-center h-full px-2">
           <MobileNavItem to={path('/')} icon={Home} label="Inicio" />
           <MobileNavItem to={path('/booking')} icon={Calendar} label="Reservar" />
-          <MobileNavItem to={path('/mis-reservas')} icon={ClipboardList} label="Mis citas" />
+          <MobileNavItem to={path('/mis-reservas')} icon={ClipboardList} label="Mis reservas" />
           <MobileNavItem to={path('/about')} icon={Info} label="Info" />
           <MobileNavItem to={path('/admin')} icon={Lock} label="Admin" />
         </div>

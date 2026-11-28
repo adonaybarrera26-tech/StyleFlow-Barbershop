@@ -113,6 +113,7 @@ export interface TicketState {
   phone: string; // celular con el que se reservó: con ese mismo se reagenda o cancela
   customerName?: string;
   rescheduled?: boolean; // true cuando la persona acaba de reagendar
+  previous?: { date: string; timeSlot: string }; // día y hora que tenía la cita antes de reagendar
 }
 
 // Lo que viaja a la pantalla de reservar cuando se reagenda una cita

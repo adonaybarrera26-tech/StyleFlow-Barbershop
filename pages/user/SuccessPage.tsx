@@ -8,6 +8,7 @@ import { buildWhatsAppLink, buildMapsLink, formatMXN, formatTime } from '../../s
 import {
   buildCancelMessage,
   buildConfirmMessage,
+  buildRescheduleMessage,
   downloadIcs,
   relativeDayText,
   saveTicketImage,
@@ -37,7 +38,7 @@ const SuccessPage: React.FC = () => {
 
   if (!state || !state.ticket) return null;
 
-  const { ticket, phone, customerName, rescheduled } = state;
+  const { ticket, phone, customerName, rescheduled, previous } = state;
   const firstName = (customerName || '').trim().split(/\s+/)[0];
 
   // Si la cita fue en una sucursal, dirección y mapa son los de esa sucursal
@@ -199,15 +200,20 @@ const SuccessPage: React.FC = () => {
         </div>
         {note && <p className="text-slate-400 text-sm text-center" role="status">{note}</p>}
 
-        {/* Confirmar por WhatsApp */}
+        {/* Confirmar (o avisar del cambio) por WhatsApp */}
         <a
-          href={buildWhatsAppLink(business, buildConfirmMessage(ticket, business.name, customerName))}
+          href={buildWhatsAppLink(
+            business,
+            rescheduled
+              ? buildRescheduleMessage(ticket, business.name, previous, customerName)
+              : buildConfirmMessage(ticket, business.name, customerName)
+          )}
           target="_blank"
           rel="noreferrer"
           className="w-full bg-green-600 hover:bg-green-700 text-paper py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
         >
           <MessageCircle size={20} aria-hidden="true" />
-          Confirmar por WhatsApp
+          {rescheduled ? 'Avisar por WhatsApp' : 'Confirmar por WhatsApp'}
         </a>
 
         {/* Reagendar y cancelar */}
