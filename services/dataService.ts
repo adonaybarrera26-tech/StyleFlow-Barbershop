@@ -87,7 +87,8 @@ const mapBooking = (row: any): Booking => ({
   timeSlot: row.time_slot,
   createdAt: row.created_at,
   locationId: row.location_id ?? null,
-  waiverAcceptedAt: row.waiver_accepted_at ?? null
+  waiverAcceptedAt: row.waiver_accepted_at ?? null,
+  folio: row.folio || undefined
 });
 
 const mapSettings = (row: any): BusinessSettings => ({
@@ -312,12 +313,24 @@ export const getTakenSlots = async (businessId: string): Promise<Booking[]> => {
   return getBookings(businessId);
 };
 
+// Folio de 4 letras para el modo demo (sin I, L, O ni Q, que se confunden)
+const FOLIO_LETTERS = 'ABCDEFGHJKMNPRSTUVWXYZ';
+const randomFolio = (taken: Set<string>): string => {
+  for (let tries = 0; tries < 50; tries++) {
+    let folio = '';
+    for (let i = 0; i < 4; i++) folio += FOLIO_LETTERS[Math.floor(Math.random() * FOLIO_LETTERS.length)];
+    if (!taken.has(folio)) return folio;
+  }
+  return Math.random().toString(36).slice(2, 7).toUpperCase();
+};
+
 // waiverAccepted: el cliente marcó que acepta el deslinde (el servidor lo exige si el negocio lo pide)
+// Regresa el id de la cita y su folio (el folio queda vacío si no se pudo leer; la cita sí se guardó).
 export const createBooking = async (
   businessId: string,
   booking: Omit<Booking, 'id' | 'createdAt'>,
   waiverAccepted = false
-): Promise<string> => {
+): Promise<{ id: string; folio?: string }> => {
   if (isSupabaseEnabled()) {
     // El precio y la duración los calcula el servidor a partir de los servicios elegidos
     const id = await supabaseRequest<string>('/rest/v1/rpc/create_booking', {
@@ -333,7 +346,15 @@ export const createBooking = async (
         p_waiver: waiverAccepted
       }
     });
-    return id;
+    // El folio lo genera la base de datos: se lee de la cita recién creada
+    let folio: string | undefined;
+    try {
+      const mine = await getMyBookings(businessId, booking.customerPhone);
+      folio = mine.find(b => b.id === id)?.folio;
+    } catch (e) {
+      console.error('No se pudo leer el folio de la cita', e);
+    }
+    return { id, folio };
   }
 
   const bookings = await getBookings(businessId);
@@ -349,16 +370,19 @@ export const createBooking = async (
   const id = Math.random().toString(36).substr(2, 9);
   const createdAt = new Date().toISOString();
 
+  const folio = randomFolio(new Set(bookings.map(b => b.folio || '')));
+
   const newBooking: Booking = {
     ...booking,
     id,
     createdAt,
-    waiverAcceptedAt: waiverAccepted ? createdAt : null
+    waiverAcceptedAt: waiverAccepted ? createdAt : null,
+    folio
   };
 
   bookings.push(newBooking);
   saveToStorage(storageKey('bookings', businessId), bookings);
-  return id;
+  return { id, folio };
 };
 
 export const deleteBooking = async (businessId: string, id: string): Promise<void> => {
@@ -378,7 +402,7 @@ export const deleteBooking = async (businessId: string, id: string): Promise<voi
 // Citas de hoy en adelante de un celular en este negocio. No incluye nombre ni teléfono.
 export const getMyBookings = async (businessId: string, phone: string): Promise<MyBooking[]> => {
   if (isSupabaseEnabled()) {
-    const rows = await supabaseRequest<any[]>('/rest/v1/rpc/get_my_bookings', {
+    const rows = await supabaseRequest<any[]>('/rest/v1/rpc/get_my_tickets', {
       method: 'POST',
       body: { p_business: businessId, p_phone: phone }
     });
@@ -389,7 +413,12 @@ export const getMyBookings = async (businessId: string, phone: string): Promise<
       services: Array.isArray(row.services) ? row.services : [],
       totalPrice: row.total_price,
       totalDuration: row.total_duration,
-      locationName: row.location_name || undefined
+      locationId: row.location_id ?? null,
+      locationName: row.location_name || undefined,
+      locationAddress: row.location_address || undefined,
+      locationMapsUrl: row.location_maps_url || undefined,
+      folio: row.folio || undefined,
+      waiverAccepted: row.waiver_accepted === true
     }));
   }
 
@@ -405,7 +434,9 @@ export const getMyBookings = async (businessId: string, phone: string): Promise<
       timeSlot: b.timeSlot,
       services: b.selectedServices,
       totalPrice: b.totalPrice,
-      totalDuration: b.totalDuration
+      totalDuration: b.totalDuration,
+      folio: b.folio,
+      waiverAccepted: !!b.waiverAcceptedAt
     }));
 };
 
@@ -426,6 +457,43 @@ export const cancelMyBooking = async (businessId: string, id: string, phone: str
   if (remaining.length === bookings.length) return false;
   saveToStorage(key, remaining);
   return true;
+};
+
+// Cambia el día y la hora de una cita propia (mismos servicios y sucursal). El folio se conserva.
+// Si el nuevo horario no se puede, la cita anterior queda como estaba. Errores: slot_taken, same_slot,
+// booking_not_found, waiver_required, past_date, day_off, invalid_time, too_many_bookings, etc.
+export const rescheduleMyBooking = async (
+  businessId: string,
+  id: string,
+  phone: string,
+  date: Date,
+  timeSlot: string,
+  waiverAccepted = false
+): Promise<string> => {
+  if (isSupabaseEnabled()) {
+    return supabaseRequest<string>('/rest/v1/rpc/reschedule_my_booking', {
+      method: 'POST',
+      body: {
+        p_business: businessId,
+        p_booking_id: id,
+        p_phone: phone,
+        p_date: toDateString(date),
+        p_time_slot: timeSlot,
+        p_waiver: waiverAccepted
+      }
+    });
+  }
+
+  const key = storageKey('bookings', businessId);
+  const bookings = getFromStorage<Booking[]>(key, []);
+  const index = bookings.findIndex(b => b.id === id && lastTenDigits(b.customerPhone) === lastTenDigits(phone));
+  if (index < 0) throw new Error('booking_not_found');
+  if (toDateString(new Date(bookings[index].date)) === toDateString(date) && bookings[index].timeSlot === timeSlot) {
+    throw new Error('same_slot');
+  }
+  bookings[index] = { ...bookings[index], date: date.toISOString(), timeSlot };
+  saveToStorage(key, bookings);
+  return id;
 };
 
 export const cleanupOldBookings = async (): Promise<void> => {
@@ -465,11 +533,11 @@ export const saveBusinessSettings = async (businessId: string, settings: Busines
 };
 
 // ---------------------------------------------------------------
-// Locales (sucursales)
+// Sucursales (locales de un negocio)
 // ---------------------------------------------------------------
 
-// Todos los locales del negocio (también los ocultos), en el orden en que se muestran.
-// Si todavía no tiene locales regresa una lista vacía y el negocio funciona como un solo lugar.
+// Todas las sucursales del negocio (también las ocultas), en el orden en que se muestran.
+// Si todavía no tiene sucursales regresa una lista vacía y el negocio funciona como un solo lugar.
 export const getLocations = async (businessId: string): Promise<BusinessLocation[]> => {
   if (isSupabaseEnabled()) {
     const rows = await supabaseRequest<any[]>(
@@ -480,7 +548,7 @@ export const getLocations = async (businessId: string): Promise<BusinessLocation
   return getFromStorage<BusinessLocation[]>(storageKey('locations', businessId), []);
 };
 
-// Crea un local (sin id) o actualiza uno que ya existe. Los locales no se borran: se ocultan (active = false).
+// Crea una sucursal (sin id) o actualiza una que ya existe. Las sucursales no se borran: se ocultan (active = false).
 export const saveLocation = async (
   businessId: string,
   location: Omit<BusinessLocation, 'id' | 'sortOrder'> & { id?: string; sortOrder?: number }

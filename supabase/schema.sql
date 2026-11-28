@@ -128,8 +128,8 @@ alter table public.settings add column if not exists waiver_enabled boolean not 
 alter table public.settings add column if not exists waiver_text text not null default ''
   check (char_length(waiver_text) <= 4000);
 
--- Locales (sucursales) de un negocio. Todo lo que quede en blanco (null) usa lo de Configuración del negocio.
--- Mientras un negocio no tenga locales, funciona como siempre (un solo lugar).
+-- Sucursales de un negocio. Todo lo que quede en blanco (null) usa lo de Configuración del negocio.
+-- Mientras un negocio no tenga sucursales, funciona como siempre (un solo lugar).
 create table if not exists public.locations (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
@@ -149,13 +149,17 @@ create table if not exists public.locations (
 );
 create index if not exists locations_business_idx on public.locations (business_id);
 
--- Un servicio sin local es de todos; con local, solo de ese
+-- Un servicio sin sucursal es de todas; con sucursal, solo de esa
 alter table public.services add column if not exists location_id uuid references public.locations(id) on delete set null;
 
--- La cita guarda en qué local es y, si el negocio pide deslinde, cuándo lo aceptó
+-- La cita guarda en qué sucursal es y, si el negocio pide deslinde, cuándo lo aceptó
 alter table public.bookings add column if not exists location_id uuid references public.locations(id) on delete set null;
 alter table public.bookings add column if not exists waiver_accepted_at timestamptz;
 create index if not exists bookings_business_date_idx on public.bookings (business_id, booking_date);
+
+-- Folio de la cita (4 letras, ej. RDRY): el cliente lo ve en su ticket y el negocio lo busca en el panel
+alter table public.bookings add column if not exists folio text;
+create unique index if not exists bookings_folio_idx on public.bookings (business_id, folio) where folio is not null;
 
 -- Correos con permiso de administrador (cada uno, en su negocio)
 create table if not exists public.admins (
@@ -321,7 +325,7 @@ drop policy if exists "services_select" on public.services;
 create policy "services_select" on public.services
   for select to anon, authenticated using (true);
 
--- (el local de un servicio tiene que ser de ese mismo negocio)
+-- (la sucursal de un servicio tiene que ser de ese mismo negocio)
 drop policy if exists "services_insert" on public.services;
 create policy "services_insert" on public.services
   for insert to authenticated with check (
@@ -354,7 +358,7 @@ create policy "settings_update" on public.settings
   for update to authenticated
   using (public.is_business_admin(business_id)) with check (public.is_business_admin(business_id));
 
--- Locales: los ve cualquiera (dirección y mapa son públicos); solo el admin de ese negocio los crea y cambia.
+-- Sucursales: las ve cualquiera (dirección y mapa son públicos); solo el admin de ese negocio las crea y cambia.
 -- No se borran: se ocultan (active = false) para no perder el historial de sus citas.
 drop policy if exists "locations_select" on public.locations;
 create policy "locations_select" on public.locations
@@ -415,7 +419,7 @@ $$;
 
 grant execute on function public.get_taken_slots(uuid, date) to anon, authenticated;
 
--- Igual que la anterior, pero dice en qué local es cada cita (la pantalla de reservas la usa para contar el cupo)
+-- Igual que la anterior, pero dice en qué sucursal es cada cita (la pantalla de reservas la usa para contar el cupo)
 create or replace function public.get_booked_slots(p_business uuid, p_from date default current_date)
 returns table (booking_date date, time_slot text, total_duration integer, location_id uuid)
 language sql
@@ -438,9 +442,9 @@ grant execute on function public.get_booked_slots(uuid, date) to anon, authentic
 -- Cambió la lista de datos: se quita la versión anterior (la nueva acepta las mismas llamadas de antes)
 drop function if exists public.create_booking(uuid, text, text, uuid[], date, text);
 
--- p_location: el local elegido (si el negocio tiene varios es obligatorio; si tiene uno, se usa ese).
+-- p_location: la sucursal elegida (si el negocio tiene varias es obligatorio; si tiene una, se usa esa).
 -- p_waiver: true si el cliente aceptó el deslinde (obligatorio solo si el negocio lo pide).
--- Cupo: en cada instante puede haber hasta "capacity" citas en el mismo local.
+-- Cupo: en cada instante puede haber hasta "capacity" citas en la misma sucursal.
 create or replace function public.create_booking(
   p_business uuid,
   p_name text,
@@ -507,7 +511,7 @@ begin
     raise exception 'waiver_required';
   end if;
 
-  -- Local: con varios locales hay que elegir uno; con uno solo se usa ese; sin locales, el negocio es un solo lugar
+  -- Sucursal: con varias sucursales hay que elegir una; con una sola se usa esa; sin sucursales, el negocio es un solo lugar
   select count(*) into v_nloc from public.locations where business_id = p_business and active;
 
   if p_location is not null then
@@ -523,7 +527,7 @@ begin
     raise exception 'location_required';
   end if;
 
-  -- Servicios: deben ser de ESTE negocio (y de todos los locales o del elegido).
+  -- Servicios: deben ser de ESTE negocio (y de todas las sucursales o de la elegida).
   -- El precio y la duración se calculan aquí, no los manda el cliente
   select
     count(*),
@@ -553,11 +557,11 @@ begin
     raise exception 'invalid_services';
   end if;
 
-  -- Horario, días de descanso y cupo: lo del local si lo tiene; si no, lo del negocio
+  -- Horario, días de descanso y cupo: lo de la sucursal si lo tiene; si no, lo del negocio
   v_work_start := coalesce(v_loc.work_start, v_set.work_start);
   v_work_end := coalesce(v_loc.work_end, v_set.work_end);
   if v_loc.work_start is not null then
-    -- si el local define su horario, también define su descanso (puede ser "sin descanso")
+    -- si la sucursal define su horario, también define su descanso (puede ser "sin descanso")
     v_break_start := v_loc.break_start;
     v_break_end := v_loc.break_end;
   else
@@ -601,7 +605,7 @@ begin
     raise exception 'too_many_bookings';
   end if;
 
-  -- Una cita a la vez por día y local, para que dos personas no se queden con el último lugar
+  -- Una cita a la vez por día y sucursal, para que dos personas no se queden con el último lugar
   perform pg_advisory_xact_lock(hashtext('bookings:' || p_business::text || ':' || p_date::text || ':' || coalesce(v_location::text, '')));
 
   -- Cupo: se revisa el momento de inicio y el inicio de cada cita que empieza durante esta;
@@ -653,7 +657,7 @@ grant execute on function public.create_booking(uuid, text, text, uuid[], date, 
 -- datos personales, la búsqueda NO regresa nombre ni teléfono, solo muestra
 -- citas de hoy en adelante, y solo se cancela una cita si el celular coincide.
 
--- Cambió la lista de datos (ahora dice el local): se quita la versión anterior
+-- Cambió la lista de datos (ahora dice la sucursal): se quita la versión anterior
 drop function if exists public.get_my_bookings(uuid, text);
 
 create or replace function public.get_my_bookings(p_business uuid, p_phone text)
@@ -729,6 +733,7 @@ begin
     E'📅 ' || public.format_slot_es(v_row.booking_date, v_row.time_slot) || E'\n' ||
     E'✂️ ' || coalesce((select string_agg(e ->> 'title', ', ') from jsonb_array_elements(v_row.services) e), '') || E'\n' ||
     coalesce(E'📍 ' || (select l.name from public.locations l where l.id = v_row.location_id) || E'\n', '') ||
+    coalesce(E'🎟 Folio ' || v_row.folio || E'\n', '') ||
     E'📱 ' || v_row.customer_phone
   );
 
@@ -822,6 +827,11 @@ as $$
 declare
   v_name text;
 begin
+  -- Al reagendar, reschedule_my_booking manda su propio aviso (y apaga este)
+  if coalesce(current_setting('app.skip_notify', true), '') = '1' then
+    return new;
+  end if;
+
   select name into v_name from public.businesses where id = new.business_id;
 
   perform public.send_telegram(
@@ -832,6 +842,7 @@ begin
     E'✂️ ' || coalesce((select string_agg(e ->> 'title', ', ') from jsonb_array_elements(new.services) e), '') || E'\n' ||
     E'💵 $' || to_char(new.total_price, 'FM999,999,990') || E'\n' ||
     coalesce(E'📍 ' || (select l.name from public.locations l where l.id = new.location_id) || E'\n', '') ||
+    coalesce(E'🎟 Folio ' || new.folio || E'\n', '') ||
     E'📱 ' || new.customer_phone
   );
   return new;
@@ -855,7 +866,7 @@ begin
 end;
 $$;
 
--- Al crear el PRIMER local de un negocio, las citas que ya tenía pasan a ese local
+-- Al crear la PRIMERA sucursal de un negocio, las citas que ya tenía pasan a esa sucursal
 create or replace function public.locations_assign_first()
 returns trigger
 language plpgsql
@@ -1067,3 +1078,200 @@ grant execute on function public.cancel_my_booking(uuid, text) to anon, authenti
 
 -- Ya no se usa: ahora el aviso lleva el negocio
 drop function if exists public.send_telegram(text);
+
+-- 11) TICKET DE LA CITA: FOLIO, VERLA Y REAGENDAR --------------------------
+-- Cada cita recibe un folio de 4 letras (sin I, L, O ni Q, que se confunden), único por negocio.
+
+create or replace function public.gen_folio(p_business uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_letters constant text := 'ABCDEFGHJKMNPRSTUVWXYZ';
+  v_folio text;
+  v_try integer := 0;
+  v_len integer := 4;
+  i integer;
+begin
+  -- un candado por negocio para que dos citas a la vez no saquen el mismo folio
+  perform pg_advisory_xact_lock(hashtext('folio:' || p_business::text));
+  loop
+    v_try := v_try + 1;
+    if v_try > 30 then v_len := 5; end if;
+    v_folio := '';
+    for i in 1..v_len loop
+      v_folio := v_folio || substr(v_letters, 1 + floor(random() * length(v_letters))::integer, 1);
+    end loop;
+    exit when not exists (select 1 from public.bookings where business_id = p_business and folio = v_folio);
+  end loop;
+  return v_folio;
+end;
+$$;
+
+revoke all on function public.gen_folio(uuid) from public, anon, authenticated;
+
+create or replace function public.bookings_set_folio()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.folio is null then
+    new.folio := public.gen_folio(new.business_id);
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.bookings_set_folio() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_trigger
+    where tgname = 'bookings_set_folio_insert' and tgrelid = 'public.bookings'::regclass
+  ) then
+    create trigger bookings_set_folio_insert
+      before insert on public.bookings
+      for each row execute function public.bookings_set_folio();
+  end if;
+end;
+$$;
+
+-- Las citas que ya existían reciben su folio
+update public.bookings set folio = public.gen_folio(business_id) where folio is null;
+
+-- Los datos del ticket de las citas de un celular (de hoy en adelante). Igual que get_my_bookings,
+-- pero agrega folio, dirección y mapa de la sucursal, y si ya aceptó el deslinde. No regresa nombre ni celular.
+create or replace function public.get_my_tickets(p_business uuid, p_phone text)
+returns table (
+  id uuid,
+  booking_date date,
+  time_slot text,
+  services jsonb,
+  total_price integer,
+  total_duration integer,
+  location_id uuid,
+  location_name text,
+  location_address text,
+  location_maps_url text,
+  folio text,
+  waiver_accepted boolean
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_digits text;
+begin
+  v_digits := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
+  if length(v_digits) < 10 or length(v_digits) > 15 then
+    raise exception 'invalid_phone';
+  end if;
+
+  return query
+    select b.id, b.booking_date, b.time_slot, b.services, b.total_price, b.total_duration,
+           b.location_id, l.name, l.address, l.maps_url, b.folio, (b.waiver_accepted_at is not null)
+    from public.bookings b
+    left join public.locations l on l.id = b.location_id
+    where b.business_id = p_business
+      and right(regexp_replace(b.customer_phone, '\D', '', 'g'), 10) = right(v_digits, 10)
+      and b.booking_date >= (now() at time zone 'America/Mexico_City')::date
+    order by b.booking_date, b.time_slot;
+end;
+$$;
+
+revoke all on function public.get_my_tickets(uuid, text) from public, anon, authenticated;
+grant execute on function public.get_my_tickets(uuid, text) to anon, authenticated;
+
+-- Reagendar: cambia el día y la hora de una cita (mismos servicios y sucursal) validando todo igual que
+-- una cita nueva. Quita la anterior y crea la nueva en una sola operación: si el nuevo horario no se puede,
+-- la cita anterior se conserva. El folio no cambia. Avisa por Telegram (un solo mensaje).
+create or replace function public.reschedule_my_booking(
+  p_business uuid,
+  p_booking_id uuid,
+  p_phone text,
+  p_date date,
+  p_time_slot text,
+  p_waiver boolean default false
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_digits text;
+  v_old public.bookings%rowtype;
+  v_new uuid;
+  v_name text;
+begin
+  v_digits := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
+  if length(v_digits) < 10 or length(v_digits) > 15 then
+    raise exception 'invalid_phone';
+  end if;
+
+  select * into v_old
+  from public.bookings b
+  where b.id = p_booking_id
+    and b.business_id = p_business
+    and right(regexp_replace(b.customer_phone, '\D', '', 'g'), 10) = right(v_digits, 10)
+    and b.booking_date >= (now() at time zone 'America/Mexico_City')::date
+  for update;
+
+  if not found then
+    raise exception 'booking_not_found';
+  end if;
+
+  if v_old.booking_date = p_date and v_old.time_slot = p_time_slot then
+    raise exception 'same_slot';
+  end if;
+
+  -- create_booking avisaría "Nueva cita"; aquí se manda un solo aviso de reagendado
+  perform set_config('app.skip_notify', '1', true);
+
+  delete from public.bookings where id = v_old.id;
+
+  v_new := public.create_booking(
+    p_business,
+    v_old.customer_name,
+    v_old.customer_phone,
+    coalesce(array(select (e ->> 'id')::uuid from jsonb_array_elements(v_old.services) e), '{}'::uuid[]),
+    p_date,
+    p_time_slot,
+    v_old.location_id,
+    coalesce(p_waiver, false) or v_old.waiver_accepted_at is not null
+  );
+
+  -- conserva el folio de la cita original
+  if v_old.folio is not null then
+    update public.bookings set folio = v_old.folio where id = v_new;
+  end if;
+
+  perform set_config('app.skip_notify', '0', true);
+
+  select name into v_name from public.businesses where id = p_business;
+
+  perform public.send_telegram(
+    p_business,
+    E'🔁 Cita reagendada · ' || coalesce(v_name, '') || E'\n' ||
+    E'👤 ' || v_old.customer_name || E'\n' ||
+    E'Antes: ' || public.format_slot_es(v_old.booking_date, v_old.time_slot) || E'\n' ||
+    E'Ahora: ' || public.format_slot_es(p_date, p_time_slot) || E'\n' ||
+    E'✂️ ' || coalesce((select string_agg(e ->> 'title', ', ') from jsonb_array_elements(v_old.services) e), '') || E'\n' ||
+    coalesce(E'📍 ' || (select l.name from public.locations l where l.id = v_old.location_id) || E'\n', '') ||
+    coalesce(E'🎟 Folio ' || v_old.folio || E'\n', '') ||
+    E'📱 ' || v_old.customer_phone
+  );
+
+  return v_new;
+end;
+$$;
+
+revoke all on function public.reschedule_my_booking(uuid, uuid, text, date, text, boolean) from public, anon, authenticated;
+grant execute on function public.reschedule_my_booking(uuid, uuid, text, date, text, boolean) to anon, authenticated;

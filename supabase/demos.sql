@@ -11,7 +11,7 @@
 --   app.tudominio.com/demo-pole         (tema "esencia": noche violeta y dorado)
 --
 -- Los datos son inventados (teléfono de prueba, direcciones de ejemplo). Los logos están en public/demos/.
--- Requiere haber ejecutado antes supabase/schema.sql (la versión con locales, cupo y deslinde).
+-- Requiere haber ejecutado antes supabase/schema.sql (la versión con sucursales, cupo y deslinde).
 
 do $$
 declare
@@ -150,14 +150,14 @@ begin
     theme = '', brand_color = '', logo_url = 'demos/pole-essence.webp'
   where id = v_id;
 
-  -- Clases con cupo y deslinde: "capacity" son los lugares por horario (cada local puede tener el suyo)
+  -- Clases con cupo y deslinde: "capacity" son los lugares por horario (cada sucursal puede tener su propio número)
   update public.settings set
     work_start = '09:00', work_end = '21:00', break_start = '14:00', break_end = '17:00',
     off_days = '{0}', slot_interval = 60,
     capacity = 1, waiver_enabled = true, waiver_text = ''
   where business_id = v_id;
 
-  -- Dos locales de ejemplo. Sá Sicarú: clases grupales de 6 lugares, con el horario general.
+  -- Dos sucursales de ejemplo. Sá Sicarú: clases grupales de 6 lugares, con el horario general.
   -- Frecuencia 528: 2 lugares, con su propio horario (10 a 20 h, sin descanso, cierra sábado y domingo).
   insert into public.locations (business_id, name, sort_order)
   select v_id, n, o from (values ('Sá Sicarú', 1), ('Frecuencia 528', 2)) as t(n, o)
@@ -187,7 +187,7 @@ begin
     {"t":"Clase privada 1 a 1","p":200,"d":60,"x":"Plan a tu medida y atención exclusiva"}
   ]'::jsonb) with ordinality as e(x, n);
 
-  -- Cada clase se ofrece solo en su local
+  -- Cada clase se ofrece solo en su sucursal
   update public.services s set location_id = l.id
   from public.locations l
   where s.business_id = v_id and l.business_id = v_id

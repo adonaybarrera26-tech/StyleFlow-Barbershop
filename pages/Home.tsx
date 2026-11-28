@@ -40,7 +40,7 @@ const Home: React.FC = () => {
   // Botones de acción rápida. Los que el negocio no tiene capturados no se muestran.
   const quickActions: QuickAction[] = [
     { label: 'Llamar', href: buildCallLink(business), icon: <Phone size={24} />, external: false },
-    // Con varios locales no hay un solo "Cómo llegar": cada local lleva su propio mapa más abajo
+    // Con varias sucursales no hay un solo "Cómo llegar": cada sucursal lleva su propio mapa más abajo
     ...(locations.length > 1
       ? []
       : [{ label: 'Cómo llegar', href: buildMapsLink(locations[0] && locations[0].address ? locations[0] : business), icon: <MapPin size={24} />, external: true }]),

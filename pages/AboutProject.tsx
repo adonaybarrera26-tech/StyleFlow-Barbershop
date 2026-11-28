@@ -7,7 +7,7 @@ import { useBusiness } from '../services/BusinessContext';
 
 const AboutProject: React.FC = () => {
   const { business, locations } = useBusiness();
-  // La tarjeta de contacto solo se muestra si el negocio capturó dirección, teléfono o locales
+  // La tarjeta de contacto solo se muestra si el negocio capturó dirección, teléfono o sucursales
   const hasContact = Boolean(business.address || business.displayPhone || locations.length > 0);
 
   return (
@@ -36,7 +36,7 @@ const AboutProject: React.FC = () => {
           </div>
           <p className="text-slate-400 leading-relaxed">
             {locations.length > 1
-              ? 'Reserva desde tu celular en cuatro pasos: elige tu local, tu servicio, tu fecha y tu hora.'
+              ? 'Reserva desde tu celular en cuatro pasos: elige tu sucursal, tu servicio, tu fecha y tu hora.'
               : 'Reserva desde tu celular en tres pasos: elige tu servicio, tu fecha y tu hora.'}
           </p>
           <ul className="space-y-3 text-sm text-slate-300">

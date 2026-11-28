@@ -5,9 +5,9 @@ import { USE_HASH_ROUTER } from '../constants';
 // El negocio que se está viendo (el que va en la dirección: .../<slug>) y una ayuda para armar sus rutas.
 interface BusinessContextType {
   business: Business;
-  // Locales activos del negocio, en orden. Vacío = el negocio es un solo lugar (sin selector de local).
+  // Sucursales activas del negocio, en orden. Vacío = el negocio es un solo lugar (sin selector de sucursal).
   locations: BusinessLocation[];
-  // Vuelve a leer los locales (el panel de administración lo usa después de guardar cambios)
+  // Vuelve a leer las sucursales (el panel de administración lo usa después de guardar cambios)
   refreshLocations: () => Promise<void>;
   // Ruta de una pantalla dentro de este negocio: path('/booking') -> "/<slug>/booking"; path() -> "/<slug>"
   path: (to?: string) => string;
