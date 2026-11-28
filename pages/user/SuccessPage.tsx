@@ -28,7 +28,7 @@ const SuccessPage: React.FC = () => {
 
   if (!bookingData) return null;
 
-  // Si la cita fue en un local, dirección y mapa son los de ese local
+  // Si la cita fue en una sucursal, dirección y mapa son los de esa sucursal
   const place = bookingData.locationName
     ? { address: bookingData.locationAddress || business.address, mapsUrl: bookingData.locationMapsUrl || '' }
     : { address: business.address, mapsUrl: business.mapsUrl };
@@ -40,7 +40,7 @@ const SuccessPage: React.FC = () => {
   const timeText = bookingData.timeSlot ? formatTime(bookingData.timeSlot) : '';
   const whatsappMessage =
     `Hola, soy ${bookingData.customerName}. Acabo de reservar una cita en ${business.name}:\n` +
-    (bookingData.locationName ? `• Local: ${bookingData.locationName}\n` : '') +
+    (bookingData.locationName ? `• Sucursal: ${bookingData.locationName}\n` : '') +
     `• Fecha: ${bookingData.formattedDate}\n` +
     `• Hora: ${timeText}\n` +
     `• Servicios: ${bookingData.servicesText || ''}\n` +
@@ -73,7 +73,7 @@ const SuccessPage: React.FC = () => {
                 </div>
                 {bookingData.locationName && (
                     <div className="flex justify-between items-center border-b border-slate-800 pb-3 gap-4">
-                        <span className="text-slate-500 text-sm flex items-center gap-1"><MapPin size={14}/> Local</span>
+                        <span className="text-slate-500 text-sm flex items-center gap-1"><MapPin size={14}/> Sucursal</span>
                         <span className="text-white font-bold text-right">{bookingData.locationName}</span>
                     </div>
                 )}

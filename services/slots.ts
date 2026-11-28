@@ -1,7 +1,7 @@
 import { BusinessLocation, BusinessSettings } from '../types';
 
-// Horario, días de descanso y lugares por horario que rigen en un local.
-// Lo que el local no define usa lo de la configuración general (igual que en la base de datos).
+// Horario, días de descanso y lugares por horario que rigen en una sucursal.
+// Lo que la sucursal no define usa lo de la configuración general (igual que en la base de datos).
 export interface Schedule {
   workStartTime: string;
   workEndTime: string;
@@ -13,7 +13,7 @@ export interface Schedule {
 }
 
 export const effectiveSchedule = (location: BusinessLocation | null, settings: BusinessSettings): Schedule => {
-  // Si el local tiene su horario, también tiene su propio descanso (que puede ser "sin descanso")
+  // Si la sucursal tiene su horario, también tiene su propio descanso (que puede ser "sin descanso")
   const ownHours = Boolean(location && location.workStartTime !== null);
   return {
     workStartTime: location?.workStartTime ?? settings.workStartTime,

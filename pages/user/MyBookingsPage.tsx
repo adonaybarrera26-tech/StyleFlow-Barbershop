@@ -14,7 +14,7 @@ const buildCancelMessage = (businessName: string, b: MyBooking): string => {
   const { weekday, full } = getDateParts(new Date(b.date));
   return (
     `Hola, cancelé mi cita en ${businessName}:\n` +
-    (b.locationName ? `• Local: ${b.locationName}\n` : '') +
+    (b.locationName ? `• Sucursal: ${b.locationName}\n` : '') +
     `• Fecha: ${weekday}, ${full}\n` +
     `• Hora: ${formatTime(b.timeSlot)}\n` +
     `• Servicios: ${b.services.map(s => s.title).join(', ')}\n` +
@@ -147,7 +147,7 @@ const MyBookingsPage: React.FC = () => {
                 <div className="bg-slate-950 rounded-xl p-4 border border-slate-800 space-y-2 text-sm">
                   {b.locationName && (
                     <div className="flex justify-between gap-4">
-                      <span className="text-slate-500">Local</span>
+                      <span className="text-slate-500">Sucursal</span>
                       <span className="text-slate-200 text-right">{b.locationName}</span>
                     </div>
                   )}

@@ -14,9 +14,9 @@ const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'summary' | 'bookings' | 'services' | 'locations' | 'settings'>('summary');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  // Todos los locales del negocio (también los ocultos)
+  // Todas las sucursales del negocio (también las ocultas)
   const [locations, setLocations] = useState<BusinessLocation[]>([]);
-  // Filtro de la lista de citas: '' = todos los locales
+  // Filtro de la lista de citas: '' = todas las sucursales
   const [locationFilter, setLocationFilter] = useState('');
   const [settings, setSettings] = useState<BusinessSettings>(DEFAULT_SETTINGS);
   const [editingService, setEditingService] = useState<Partial<Service> | null>(null);
@@ -83,7 +83,7 @@ const AdminDashboard: React.FC = () => {
         const b = await getBookings(business.id);
         const s = await getServices(business.id);
         const config = await getBusinessSettings(business.id);
-        // Si no se pueden leer los locales, el panel sigue funcionando como un solo lugar
+        // Si no se pueden leer las sucursales, el panel sigue funcionando como un solo lugar
         const locs = await getLocations(business.id).catch(() => [] as BusinessLocation[]);
 
         // Ordenar citas: día ascendente y luego hora ascendente
@@ -133,7 +133,7 @@ const AdminDashboard: React.FC = () => {
       return {
         'Cliente': b.customerName,
         'Celular': b.customerPhone,
-        ...(locations.length > 0 ? { 'Local': locationName(b) } : {}),
+        ...(locations.length > 0 ? { 'Sucursal': locationName(b) } : {}),
         'Servicios': b.selectedServices.map(s => s.title).join(', '),
         'Fecha': full,
         'Hora': formatTime(b.timeSlot),
@@ -204,7 +204,7 @@ const AdminDashboard: React.FC = () => {
                                           <th width="12%">Hora</th>
                                           <th width="22%">Cliente</th>
                                           <th width="18%">Celular</th>
-                                          ${locations.length > 0 ? '<th width="15%">Local</th>' : ''}
+                                          ${locations.length > 0 ? '<th width="15%">Sucursal</th>' : ''}
                                           <th width="22%">Servicios</th>
                                           <th width="12%">Total (MXN)</th>
                                       </tr>
@@ -327,7 +327,7 @@ const AdminDashboard: React.FC = () => {
       navigate(path('/admin/login'));
   }
 
-  // Nombre del local de una cita ('' si el negocio no usa locales o la cita es anterior a ellos)
+  // Nombre de la sucursal de una cita ('' si el negocio no usa sucursales o la cita es anterior a ellos)
   function locationName(b: Booking): string {
       return locations.find(l => l.id === b.locationId)?.name || '';
   }
@@ -566,7 +566,7 @@ const AdminDashboard: React.FC = () => {
           onClick={() => setActiveTab('locations')}
           className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'locations' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
         >
-          Locales
+          Sucursales
           {activeTab === 'locations' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
         </button>
         <button
@@ -625,10 +625,10 @@ const AdminDashboard: React.FC = () => {
                       <select
                         value={locationFilter}
                         onChange={e => setLocationFilter(e.target.value)}
-                        aria-label="Filtrar citas por local"
+                        aria-label="Filtrar citas por sucursal"
                         className="bg-slate-800 text-slate-300 px-3 py-2 rounded-lg border border-slate-700 outline-none focus:border-amber-500"
                       >
-                          <option value="">Todos los locales</option>
+                          <option value="">Todas las sucursales</option>
                           {locations.map(l => (
                               <option key={l.id} value={l.id}>{l.name}</option>
                           ))}
@@ -816,7 +816,7 @@ const AdminDashboard: React.FC = () => {
                                 onChange={e => setEditingService({...editingService, locationId: e.target.value || null})}
                                 className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-amber-500 outline-none"
                               >
-                                  <option value="">Todos los locales</option>
+                                  <option value="">Todas las sucursales</option>
                                   {locations.map(l => (
                                       <option key={l.id} value={l.id}>{l.name}{l.active ? '' : ' (oculto)'}</option>
                                   ))}
@@ -840,7 +840,7 @@ const AdminDashboard: React.FC = () => {
                            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><Clock size={12}/> {service.durationMinutes} min</p>
                            {locations.length > 0 && (
                                <p className="text-xs text-amber-500 mt-1 flex items-center gap-1">
-                                   <MapPin size={12} aria-hidden="true" /> {locations.find(l => l.id === service.locationId)?.name || 'Todos los locales'}
+                                   <MapPin size={12} aria-hidden="true" /> {locations.find(l => l.id === service.locationId)?.name || 'Todas las sucursales'}
                                </p>
                            )}
                        </div>
@@ -998,7 +998,7 @@ const AdminDashboard: React.FC = () => {
                   <h3 className="font-bold text-white text-lg mb-2">Lugares por horario</h3>
                   <p className="text-slate-400 text-sm mb-4">
                       Cuántas personas pueden reservar al mismo tiempo. Déjalo en 1 si atiendes una persona a la vez; ponlo en 6 si tu clase tiene 6 lugares.
-                      {locations.length > 0 && ' Cada local puede tener su propio número.'}
+                      {locations.length > 0 && ' Cada sucursal puede tener su propio número.'}
                   </p>
                   <label htmlFor="cupo-por-horario" className="block text-slate-400 text-sm mb-2">Lugares por horario</label>
                   <select

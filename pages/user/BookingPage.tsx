@@ -12,7 +12,7 @@ import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, 
 const BookingPage: React.FC = () => {
   const navigate = useNavigate();
   const { business, path, locations } = useBusiness();
-  // Con varios locales el primer paso es elegir uno; con uno solo se usa ese sin preguntar
+  // Con varias sucursales el primer paso es elegir una; con una sola se usa esa sin preguntar
   const needsLocation = locations.length > 1;
   const stepShift = needsLocation ? 1 : 0;
   const [step, setStep] = useState(needsLocation ? 0 : 1);
@@ -60,13 +60,13 @@ const BookingPage: React.FC = () => {
     initData();
   }, []);
 
-  // Horario, descanso y lugares por horario del local elegido (o del negocio, si no tiene locales)
+  // Horario, descanso y lugares por horario de la sucursal elegida (o del negocio, si no tiene sucursales)
   const schedule = effectiveSchedule(selectedLocation, settings);
 
-  // Servicios que se ofrecen en el local elegido (los que no tienen local se ofrecen en todos)
+  // Servicios que se ofrecen en la sucursal elegida (los que no tienen sucursal se ofrecen en todas)
   const visibleServices = services.filter(s => !s.locationId || s.locationId === selectedLocation?.id);
 
-  // Actualiza los horarios disponibles cuando cambia la fecha, el local o las citas
+  // Actualiza los horarios disponibles cuando cambia la fecha, la sucursal o las citas
   useEffect(() => {
     if (loadingData) return;
 
@@ -83,7 +83,7 @@ const BookingPage: React.FC = () => {
         setIsDayOff(false);
     }
 
-    // Citas del día seleccionado en este local
+    // Citas del día seleccionado en esta sucursal
     const dayBookings = allBookings.filter(b =>
         new Date(b.date).toDateString() === dateString && (b.locationId ?? null) === (selectedLocation?.id ?? null)
     );
@@ -126,7 +126,7 @@ const BookingPage: React.FC = () => {
     }
   }, [selectedDate, allBookings, selectedTime, settings, loadingData, selectedServices, selectedLocation]);
 
-  // Elegir (o cambiar) el local: los servicios que no se ofrecen ahí se quitan y la hora se vuelve a elegir
+  // Elegir (o cambiar) la sucursal: los servicios que no se ofrecen ahí se quitan y la hora se vuelve a elegir
   const chooseLocation = (location: BusinessLocation) => {
     setSelectedLocation(location);
     setSelectedServices(prev => prev.filter(s => !s.locationId || s.locationId === location.id));
@@ -135,7 +135,7 @@ const BookingPage: React.FC = () => {
     setStep(1);
   };
 
-  // Local elegido, para recordarlo en los pasos siguientes (solo cuando hay varios)
+  // Sucursal elegida, para recordarlo en los pasos siguientes (solo cuando hay varias)
   const locationBadge = needsLocation && selectedLocation ? (
     <p className="flex items-center gap-1.5 text-sm text-slate-400">
       <MapPin size={14} className="text-amber-500" aria-hidden="true" /> {selectedLocation.name}
@@ -213,7 +213,7 @@ const BookingPage: React.FC = () => {
           setFormError('Para reservar necesitas aceptar el deslinde.');
         } else if (code === 'location_required' || code === 'invalid_location') {
           setStep(needsLocation ? 0 : 1);
-          setFormError('Elige un local para continuar.');
+          setFormError('Elige una sucursal para continuar.');
         } else if (code === 'invalid_services') {
           try {
             setServices(await getServices(business.id));
@@ -264,12 +264,12 @@ const BookingPage: React.FC = () => {
       );
   }
 
-  // --- Paso 0 (solo si hay varios locales): elegir local ---
+  // --- Paso 0 (solo si hay varias sucursales): elegir sucursal ---
   if (step === 0) {
     return (
       <div className="space-y-6 animate-in slide-in-from-right-4 pb-24">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">Elige tu local</h2>
+          <h2 className="text-2xl font-bold text-white">Elige tu sucursal</h2>
           <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso 1 de {3 + stepShift}</span>
         </div>
 
@@ -311,7 +311,7 @@ const BookingPage: React.FC = () => {
       <div className="space-y-6 animate-in slide-in-from-right-4 pb-40 md:pb-0">
         {needsLocation && (
           <button onClick={() => setStep(0)} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
-            <ChevronLeft size={16} /> Cambiar de local
+            <ChevronLeft size={16} /> Cambiar de sucursal
           </button>
         )}
 
@@ -554,7 +554,7 @@ const BookingPage: React.FC = () => {
              <h3 className="font-bold text-white mb-2">Resumen de tu cita</h3>
              {selectedLocation && (
                  <div className="flex justify-between text-sm gap-4">
-                     <span className="text-slate-400">Local:</span>
+                     <span className="text-slate-400">Sucursal:</span>
                      <span className="font-medium text-slate-200 text-right">{selectedLocation.name}</span>
                  </div>
              )}

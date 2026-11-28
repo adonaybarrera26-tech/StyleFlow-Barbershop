@@ -43,13 +43,13 @@ Con la base de datos activa (siguiente sección), cada negocio nuevo toma un min
 3. El administrador entra a `.../sereno-spa/admin`, cambia sus servicios y precios, y ajusta el horario.
 4. Para lo demás (teléfono visible, frase de portada, Instagram, Facebook, TikTok, mapa, etiquetas y promociones), abre **Table Editor → businesses** y llena las columnas del negocio.
 
-### Varios locales, clases con cupo y deslinde
+### Varias sucursales, clases con cupo y deslinde
 
 Todo se configura desde el panel de administración del negocio (`.../<negocio>/admin`), sin tocar código:
 
-- **Locales** (pestaña *Locales*): si el negocio tiene dos o más locales, el cliente elige uno antes de reservar. Cada local tiene su nombre, dirección y mapa, y puede tener su propio horario, días de descanso y lugares por horario; lo que se deja en blanco usa la configuración general. Los locales no se borran, se ocultan. Con un solo local activo (o ninguno) el cliente reserva sin elegir.
-- **Lugares por horario** (pestaña *Configuración*, o por local): cuántas personas pueden reservar al mismo tiempo. En 1 se atiende una persona a la vez; en 6 es una clase con 6 lugares, y el cliente ve cuántos quedan.
-- **Servicios por local** (pestaña *Servicios*, campo *Disponible en*): un servicio puede ofrecerse en todos los locales o solo en uno.
+- **Sucursales** (pestaña *Sucursales*): si el negocio tiene dos o más sucursales, el cliente elige una antes de reservar. Cada sucursal tiene su nombre, dirección y mapa, y puede tener su propio horario, días de descanso y lugares por horario; lo que se deja en blanco usa la configuración general. Las sucursales no se borran, se ocultan. Con una sola sucursal activa (o ninguno) el cliente reserva sin elegir.
+- **Lugares por horario** (pestaña *Configuración*, o por sucursal): cuántas personas pueden reservar al mismo tiempo. En 1 se atiende una persona a la vez; en 6 es una clase con 6 lugares, y el cliente ve cuántos quedan.
+- **Servicios por sucursal** (pestaña *Servicios*, campo *Disponible en*): un servicio puede ofrecerse en todas las sucursales o solo en una.
 - **Deslinde** (pestaña *Configuración*): si se activa, el cliente debe aceptarlo para reservar y queda guardada la fecha en que lo aceptó. En blanco muestra un texto general; conviene que lo revise un abogado.
 
 Los clientes **no crean cuenta**: reservan con nombre y celular. Los anticipos y comprobantes de pago se acuerdan por WhatsApp con el negocio, fuera de la app.
@@ -70,7 +70,7 @@ Los looks están en [`services/themes.ts`](./services/themes.ts) y las ilustraci
 
 ### Demos para enseñar a clientes
 
-[`supabase/demos.sql`](./supabase/demos.sql) crea cuatro negocios de ejemplo (spa, dentista, nutriólogo y estudio de pole) con sus servicios, horarios, promoción y logo; el estudio de pole trae dos locales, clases con cupo y deslinde. Cambia el correo del inicio por el tuyo, pégalo en el SQL Editor y ejecútalo (se puede repetir). Quedan en `.../demo-spa`, `.../demo-dentista`, `.../demo-nutriologo` y `.../demo-pole`; la barbería de ejemplo es `.../demo-barberia`.
+[`supabase/demos.sql`](./supabase/demos.sql) crea cuatro negocios de ejemplo (spa, dentista, nutriólogo y estudio de pole) con sus servicios, horarios, promoción y logo; el estudio de pole trae dos sucursales, clases con cupo y deslinde. Cambia el correo del inicio por el tuyo, pégalo en el SQL Editor y ejecútalo (se puede repetir). Quedan en `.../demo-spa`, `.../demo-dentista`, `.../demo-nutriologo` y `.../demo-pole`; la barbería de ejemplo es `.../demo-barberia`.
 
 Las direcciones `admin`, `api`, `app` y `assets` están reservadas. Los negocios con `active = false` dejan de mostrarse.
 

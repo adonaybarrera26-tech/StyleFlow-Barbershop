@@ -128,8 +128,8 @@ alter table public.settings add column if not exists waiver_enabled boolean not 
 alter table public.settings add column if not exists waiver_text text not null default ''
   check (char_length(waiver_text) <= 4000);
 
--- Locales (sucursales) de un negocio. Todo lo que quede en blanco (null) usa lo de Configuración del negocio.
--- Mientras un negocio no tenga locales, funciona como siempre (un solo lugar).
+-- Sucursales de un negocio. Todo lo que quede en blanco (null) usa lo de Configuración del negocio.
+-- Mientras un negocio no tenga sucursales, funciona como siempre (un solo lugar).
 create table if not exists public.locations (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
@@ -149,10 +149,10 @@ create table if not exists public.locations (
 );
 create index if not exists locations_business_idx on public.locations (business_id);
 
--- Un servicio sin local es de todos; con local, solo de ese
+-- Un servicio sin sucursal es de todas; con sucursal, solo de esa
 alter table public.services add column if not exists location_id uuid references public.locations(id) on delete set null;
 
--- La cita guarda en qué local es y, si el negocio pide deslinde, cuándo lo aceptó
+-- La cita guarda en qué sucursal es y, si el negocio pide deslinde, cuándo lo aceptó
 alter table public.bookings add column if not exists location_id uuid references public.locations(id) on delete set null;
 alter table public.bookings add column if not exists waiver_accepted_at timestamptz;
 create index if not exists bookings_business_date_idx on public.bookings (business_id, booking_date);
@@ -321,7 +321,7 @@ drop policy if exists "services_select" on public.services;
 create policy "services_select" on public.services
   for select to anon, authenticated using (true);
 
--- (el local de un servicio tiene que ser de ese mismo negocio)
+-- (la sucursal de un servicio tiene que ser de ese mismo negocio)
 drop policy if exists "services_insert" on public.services;
 create policy "services_insert" on public.services
   for insert to authenticated with check (
@@ -354,7 +354,7 @@ create policy "settings_update" on public.settings
   for update to authenticated
   using (public.is_business_admin(business_id)) with check (public.is_business_admin(business_id));
 
--- Locales: los ve cualquiera (dirección y mapa son públicos); solo el admin de ese negocio los crea y cambia.
+-- Sucursales: las ve cualquiera (dirección y mapa son públicos); solo el admin de ese negocio las crea y cambia.
 -- No se borran: se ocultan (active = false) para no perder el historial de sus citas.
 drop policy if exists "locations_select" on public.locations;
 create policy "locations_select" on public.locations
@@ -415,7 +415,7 @@ $$;
 
 grant execute on function public.get_taken_slots(uuid, date) to anon, authenticated;
 
--- Igual que la anterior, pero dice en qué local es cada cita (la pantalla de reservas la usa para contar el cupo)
+-- Igual que la anterior, pero dice en qué sucursal es cada cita (la pantalla de reservas la usa para contar el cupo)
 create or replace function public.get_booked_slots(p_business uuid, p_from date default current_date)
 returns table (booking_date date, time_slot text, total_duration integer, location_id uuid)
 language sql
@@ -438,9 +438,9 @@ grant execute on function public.get_booked_slots(uuid, date) to anon, authentic
 -- Cambió la lista de datos: se quita la versión anterior (la nueva acepta las mismas llamadas de antes)
 drop function if exists public.create_booking(uuid, text, text, uuid[], date, text);
 
--- p_location: el local elegido (si el negocio tiene varios es obligatorio; si tiene uno, se usa ese).
+-- p_location: la sucursal elegida (si el negocio tiene varias es obligatorio; si tiene una, se usa esa).
 -- p_waiver: true si el cliente aceptó el deslinde (obligatorio solo si el negocio lo pide).
--- Cupo: en cada instante puede haber hasta "capacity" citas en el mismo local.
+-- Cupo: en cada instante puede haber hasta "capacity" citas en la misma sucursal.
 create or replace function public.create_booking(
   p_business uuid,
   p_name text,
@@ -507,7 +507,7 @@ begin
     raise exception 'waiver_required';
   end if;
 
-  -- Local: con varios locales hay que elegir uno; con uno solo se usa ese; sin locales, el negocio es un solo lugar
+  -- Sucursal: con varias sucursales hay que elegir una; con una sola se usa esa; sin sucursales, el negocio es un solo lugar
   select count(*) into v_nloc from public.locations where business_id = p_business and active;
 
   if p_location is not null then
@@ -523,7 +523,7 @@ begin
     raise exception 'location_required';
   end if;
 
-  -- Servicios: deben ser de ESTE negocio (y de todos los locales o del elegido).
+  -- Servicios: deben ser de ESTE negocio (y de todas las sucursales o de la elegida).
   -- El precio y la duración se calculan aquí, no los manda el cliente
   select
     count(*),
@@ -553,11 +553,11 @@ begin
     raise exception 'invalid_services';
   end if;
 
-  -- Horario, días de descanso y cupo: lo del local si lo tiene; si no, lo del negocio
+  -- Horario, días de descanso y cupo: lo de la sucursal si lo tiene; si no, lo del negocio
   v_work_start := coalesce(v_loc.work_start, v_set.work_start);
   v_work_end := coalesce(v_loc.work_end, v_set.work_end);
   if v_loc.work_start is not null then
-    -- si el local define su horario, también define su descanso (puede ser "sin descanso")
+    -- si la sucursal define su horario, también define su descanso (puede ser "sin descanso")
     v_break_start := v_loc.break_start;
     v_break_end := v_loc.break_end;
   else
@@ -601,7 +601,7 @@ begin
     raise exception 'too_many_bookings';
   end if;
 
-  -- Una cita a la vez por día y local, para que dos personas no se queden con el último lugar
+  -- Una cita a la vez por día y sucursal, para que dos personas no se queden con el último lugar
   perform pg_advisory_xact_lock(hashtext('bookings:' || p_business::text || ':' || p_date::text || ':' || coalesce(v_location::text, '')));
 
   -- Cupo: se revisa el momento de inicio y el inicio de cada cita que empieza durante esta;
@@ -653,7 +653,7 @@ grant execute on function public.create_booking(uuid, text, text, uuid[], date, 
 -- datos personales, la búsqueda NO regresa nombre ni teléfono, solo muestra
 -- citas de hoy en adelante, y solo se cancela una cita si el celular coincide.
 
--- Cambió la lista de datos (ahora dice el local): se quita la versión anterior
+-- Cambió la lista de datos (ahora dice la sucursal): se quita la versión anterior
 drop function if exists public.get_my_bookings(uuid, text);
 
 create or replace function public.get_my_bookings(p_business uuid, p_phone text)
@@ -855,7 +855,7 @@ begin
 end;
 $$;
 
--- Al crear el PRIMER local de un negocio, las citas que ya tenía pasan a ese local
+-- Al crear la PRIMERA sucursal de un negocio, las citas que ya tenía pasan a esa sucursal
 create or replace function public.locations_assign_first()
 returns trigger
 language plpgsql

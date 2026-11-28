@@ -4,10 +4,10 @@ export interface Service {
   price: number;
   durationMinutes: number;
   description?: string;
-  locationId?: string | null; // vacío = se ofrece en todos los locales; con valor, solo en ese
+  locationId?: string | null; // vacío = se ofrece en todas las sucursales; con valor, solo en esa
 }
 
-// Local (sucursal) de un negocio. Lo que queda en blanco (null) usa lo de la configuración general.
+// Sucursal de un negocio. Lo que queda en blanco (null) usa lo de la configuración general.
 export interface BusinessLocation {
   id: string;
   name: string;
@@ -65,7 +65,7 @@ export interface Booking {
   date: string; // ISO String for date
   timeSlot: string; // "14:00"
   createdAt: string;
-  locationId?: string | null; // local de la cita (vacío = el negocio no tiene locales)
+  locationId?: string | null; // sucursal de la cita (vacío = el negocio no tiene sucursales)
   waiverAcceptedAt?: string | null; // cuándo aceptó el deslinde (si el negocio lo pide)
 }
 
@@ -77,7 +77,7 @@ export interface MyBooking {
   services: Service[];
   totalPrice: number;
   totalDuration: number;
-  locationName?: string; // local de la cita, si el negocio tiene locales
+  locationName?: string; // sucursal de la cita, si el negocio tiene sucursales
 }
 
 export enum UserRole {

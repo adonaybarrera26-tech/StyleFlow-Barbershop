@@ -26,7 +26,7 @@ const BusinessShell: React.FC = () => {
     getBusiness(slug.toLowerCase())
       .then(async business => {
         if (!business) return null;
-        // Si no se pueden leer los locales, el negocio se muestra como un solo lugar
+        // Si no se pueden leer las sucursales, el negocio se muestra como un solo lugar
         const all = await getLocations(business.id).catch(() => [] as BusinessLocation[]);
         return { business, locations: all.filter(l => l.active) };
       })
@@ -42,7 +42,7 @@ const BusinessShell: React.FC = () => {
     };
   }, [slug, attempt]);
 
-  // Vuelve a leer los locales sin recargar la página (después de que el dueño los edita en el panel)
+  // Vuelve a leer las sucursales sin recargar la página (después de que el dueño las edita en el panel)
   const businessId = state.status === 'ready' ? state.business.id : null;
   const refreshLocations = useCallback(async () => {
     if (!businessId) return;

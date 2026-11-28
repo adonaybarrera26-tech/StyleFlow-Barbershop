@@ -20,7 +20,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')
 const inputClass =
   'w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-amber-500 outline-none';
 
-// Lo que se edita en el formulario: lo que el local deja "igual que el negocio" se guarda como vacío (null)
+// Lo que se edita en el formulario: lo que la sucursal deja "igual que el negocio" se guarda como vacío (null)
 interface Draft {
   id?: string;
   name: string;
@@ -34,7 +34,7 @@ interface Draft {
   breakEndTime: string;
   ownOffDays: boolean;
   offDays: number[];
-  slotInterval: number | null; // no se edita aquí: se conserva lo que ya tenga el local
+  slotInterval: number | null; // no se edita aquí: se conserva lo que ya tenga la sucursal
   active: boolean;
 }
 
@@ -120,7 +120,7 @@ const AdminLocations: React.FC<Props> = ({ businessId, locations, settings, onCh
   });
 
   const validate = (d: Draft): string => {
-    if (!d.name.trim()) return 'Escribe el nombre del local.';
+    if (!d.name.trim()) return 'Escribe el nombre de la sucursal.';
     if (d.mapsUrl.trim() && !/^https?:\/\//i.test(d.mapsUrl.trim())) {
       return 'El enlace del mapa debe empezar con http:// o https://.';
     }
@@ -149,22 +149,22 @@ const AdminLocations: React.FC<Props> = ({ businessId, locations, settings, onCh
       await saveLocation(businessId, { ...toBody(draft), id: draft.id });
       setDraft(null);
       await onChanged();
-      onSuccess('Local guardado correctamente.');
+      onSuccess('Sucursal guardada correctamente.');
     } catch (e) {
-      onError(e, 'No se pudo guardar el local. Intenta de nuevo.');
+      onError(e, 'No se pudo guardar la sucursal. Intenta de nuevo.');
     } finally {
       setSaving(false);
     }
   };
 
-  // Los locales no se borran (las citas ya hechas dependen de ellos): se ocultan y dejan de aparecer al reservar
+  // Las sucursales no se borran (las citas ya hechas dependen de ellas): se ocultan y dejan de aparecer al reservar
   const toggleActive = async (l: BusinessLocation) => {
     try {
       await saveLocation(businessId, { ...l, active: !l.active });
       await onChanged();
-      onSuccess(l.active ? 'El local ya no aparece al reservar.' : 'El local ya aparece al reservar.');
+      onSuccess(l.active ? 'La sucursal ya no aparece al reservar.' : 'La sucursal ya aparece al reservar.');
     } catch (e) {
-      onError(e, 'No se pudo cambiar el local. Intenta de nuevo.');
+      onError(e, 'No se pudo cambiar la sucursal. Intenta de nuevo.');
     }
   };
 
@@ -195,14 +195,14 @@ const AdminLocations: React.FC<Props> = ({ businessId, locations, settings, onCh
         {locations.length === 0 ? (
           <>
             Si tu negocio tiene <strong className="text-slate-200">un solo lugar</strong>, no necesitas agregar nada.
-            Si tienes <strong className="text-slate-200">dos o más locales</strong>, agrégalos aquí: tus clientes
-            elegirán el local antes de reservar y cada uno puede tener su dirección, su horario y sus lugares por horario.
+            Si tienes <strong className="text-slate-200">dos o más sucursales</strong>, agrégalas aquí: tus clientes
+            elegirán la sucursal antes de reservar y cada una puede tener su dirección, su horario y sus lugares por horario.
           </>
         ) : activeCount > 1 ? (
-          <>Tus clientes eligen uno de estos locales al reservar. Lo que dejes sin llenar en un local usa la configuración general.</>
+          <>Tus clientes eligen una de estas sucursales al reservar. Lo que dejes sin llenar en una sucursal usa la configuración general.</>
         ) : (
           <>
-            Con un solo local activo, tus clientes reservan sin elegir local. Agrega otro (o muestra uno oculto) para
+            Con una sola sucursal activa, tus clientes reservan sin elegir sucursal. Agrega otra (o muestra una oculta) para
             que puedan escoger.
           </>
         )}
@@ -216,17 +216,17 @@ const AdminLocations: React.FC<Props> = ({ businessId, locations, settings, onCh
           }}
           className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors border border-slate-700"
         >
-          <Plus size={18} /> Agregar local
+          <Plus size={18} /> Agregar sucursal
         </button>
       )}
 
       {draft && (
         <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-6 animate-in fade-in slide-in-from-top-4">
-          <h3 className="font-bold text-white">{draft.id ? 'Editar local' : 'Agregar local'}</h3>
+          <h3 className="font-bold text-white">{draft.id ? 'Editar sucursal' : 'Agregar sucursal'}</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="loc-name" className="block text-slate-400 text-sm mb-2">Nombre del local</label>
+              <label htmlFor="loc-name" className="block text-slate-400 text-sm mb-2">Nombre de la sucursal</label>
               <input
                 id="loc-name"
                 type="text"
@@ -285,7 +285,7 @@ const AdminLocations: React.FC<Props> = ({ businessId, locations, settings, onCh
                 onChange={e => setDraft({ ...draft, ownHours: e.target.checked })}
                 className="h-5 w-5 accent-amber-500"
               />
-              Este local tiene su propio horario
+              Esta sucursal tiene su propio horario
             </label>
             {draft.ownHours && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -306,7 +306,7 @@ const AdminLocations: React.FC<Props> = ({ businessId, locations, settings, onCh
                 onChange={e => setDraft({ ...draft, ownOffDays: e.target.checked })}
                 className="h-5 w-5 accent-amber-500"
               />
-              Este local tiene sus propios días de descanso
+              Esta sucursal tiene sus propios días de descanso
             </label>
             {draft.ownOffDays && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

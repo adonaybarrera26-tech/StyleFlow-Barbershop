@@ -465,11 +465,11 @@ export const saveBusinessSettings = async (businessId: string, settings: Busines
 };
 
 // ---------------------------------------------------------------
-// Locales (sucursales)
+// Sucursales (locales de un negocio)
 // ---------------------------------------------------------------
 
-// Todos los locales del negocio (también los ocultos), en el orden en que se muestran.
-// Si todavía no tiene locales regresa una lista vacía y el negocio funciona como un solo lugar.
+// Todas las sucursales del negocio (también las ocultas), en el orden en que se muestran.
+// Si todavía no tiene sucursales regresa una lista vacía y el negocio funciona como un solo lugar.
 export const getLocations = async (businessId: string): Promise<BusinessLocation[]> => {
   if (isSupabaseEnabled()) {
     const rows = await supabaseRequest<any[]>(
@@ -480,7 +480,7 @@ export const getLocations = async (businessId: string): Promise<BusinessLocation
   return getFromStorage<BusinessLocation[]>(storageKey('locations', businessId), []);
 };
 
-// Crea un local (sin id) o actualiza uno que ya existe. Los locales no se borran: se ocultan (active = false).
+// Crea una sucursal (sin id) o actualiza una que ya existe. Las sucursales no se borran: se ocultan (active = false).
 export const saveLocation = async (
   businessId: string,
   location: Omit<BusinessLocation, 'id' | 'sortOrder'> & { id?: string; sortOrder?: number }
