@@ -40,6 +40,7 @@ export const buildConfirmMessage = (t: MyBooking, businessName: string, customer
     `Hola${customerName ? `, soy ${customerName}` : ''}. Acabo de reservar una cita en ${businessName}:\n` +
     (t.folio ? `• Folio: ${t.folio}\n` : '') +
     (t.locationName ? `• Sucursal: ${t.locationName}\n` : '') +
+    (t.professionalName ? `• Con: ${t.professionalName}\n` : '') +
     `• Fecha: ${weekday}, ${full}\n` +
     `• Hora: ${formatTime(t.timeSlot)}\n` +
     `• Servicios: ${t.services.map(s => s.title).join(', ')}\n` +
@@ -54,6 +55,7 @@ export const buildCancelMessage = (t: MyBooking, businessName: string): string =
     `Hola, cancelé mi cita en ${businessName}:\n` +
     (t.folio ? `• Folio: ${t.folio}\n` : '') +
     (t.locationName ? `• Sucursal: ${t.locationName}\n` : '') +
+    (t.professionalName ? `• Con: ${t.professionalName}\n` : '') +
     `• Fecha: ${weekday}, ${full}\n` +
     `• Hora: ${formatTime(t.timeSlot)}\n` +
     `• Servicios: ${t.services.map(s => s.title).join(', ')}\n` +
@@ -96,6 +98,7 @@ export const buildIcs = (t: MyBooking, ctx: TicketContext): string => {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const description =
     `Servicios: ${t.services.map(s => s.title).join(', ')}` +
+    (t.professionalName ? `\nCon: ${t.professionalName}` : '') +
     (t.folio ? `\nFolio: ${t.folio}` : '') +
     `\nTotal a pagar en el local: ${formatMXN(t.totalPrice)}`;
 
@@ -227,6 +230,7 @@ export const buildTicketImage = async (t: MyBooking, ctx2: TicketContext): Promi
   const { weekday, full } = getDateParts(ticketDay(t));
   const rows: Array<[string, string]> = [];
   if (t.locationName) rows.push(['Sucursal', t.locationName]);
+  if (t.professionalName) rows.push(['Con', t.professionalName]);
   rows.push(['Fecha', `${weekday}, ${full}`]);
   rows.push(['Hora', formatTime(t.timeSlot)]);
   rows.push(['Servicios', t.services.map(s => s.title).join(', ')]);

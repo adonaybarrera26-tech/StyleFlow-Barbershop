@@ -1,7 +1,9 @@
-import { BusinessLocation, BusinessSettings } from '../types';
+import { BusinessLocation, BusinessSettings, Professional } from '../types';
 
-// Horario, días de descanso y lugares por horario que rigen en una sucursal.
-// Lo que la sucursal no define usa lo de la configuración general (igual que en la base de datos).
+// Horario, días de descanso y lugares por horario que rigen en una cita.
+// Manda lo del profesional; lo que no define usa lo de la sucursal y, si tampoco, lo de la configuración general
+// (igual que en la base de datos). Un profesional atiende a una persona a la vez.
+
 export interface Schedule {
   workStartTime: string;
   workEndTime: string;
@@ -12,17 +14,33 @@ export interface Schedule {
   capacity: number;
 }
 
-export const effectiveSchedule = (location: BusinessLocation | null, settings: BusinessSettings): Schedule => {
-  // Si la sucursal tiene su horario, también tiene su propio descanso (que puede ser "sin descanso")
-  const ownHours = Boolean(location && location.workStartTime !== null);
+export const effectiveSchedule = (
+  location: BusinessLocation | null,
+  settings: BusinessSettings,
+  professional: Professional | null = null
+): Schedule => {
+  // Si el profesional (o la sucursal) tiene su horario, también tiene su propio descanso (que puede ser "sin descanso")
+  const proHours = Boolean(professional && professional.workStartTime !== null);
+  const locHours = Boolean(location && location.workStartTime !== null);
+
+  let breakStartTime = settings.breakStartTime;
+  let breakEndTime = settings.breakEndTime;
+  if (proHours) {
+    breakStartTime = professional!.breakStartTime;
+    breakEndTime = professional!.breakEndTime;
+  } else if (locHours) {
+    breakStartTime = location!.breakStartTime;
+    breakEndTime = location!.breakEndTime;
+  }
+
   return {
-    workStartTime: location?.workStartTime ?? settings.workStartTime,
-    workEndTime: location?.workEndTime ?? settings.workEndTime,
-    breakStartTime: ownHours ? location!.breakStartTime : settings.breakStartTime,
-    breakEndTime: ownHours ? location!.breakEndTime : settings.breakEndTime,
-    offDays: location?.offDays ?? settings.offDays,
+    workStartTime: professional?.workStartTime ?? location?.workStartTime ?? settings.workStartTime,
+    workEndTime: professional?.workEndTime ?? location?.workEndTime ?? settings.workEndTime,
+    breakStartTime,
+    breakEndTime,
+    offDays: professional?.offDays ?? location?.offDays ?? settings.offDays,
     slotInterval: location?.slotInterval ?? settings.slotInterval,
-    capacity: location?.capacity ?? settings.capacity ?? 1
+    capacity: professional ? 1 : location?.capacity ?? settings.capacity ?? 1
   };
 };
 

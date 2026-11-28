@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Service, Booking, BusinessLocation, BusinessSettings, MyBooking, RescheduleState, TicketState } from '../../types';
-import { getServices, createBooking, rescheduleMyBooking, getTakenSlots, getBusinessSettings } from '../../services/dataService';
+import { Service, Booking, BusinessLocation, BusinessSettings, MyBooking, Professional, RescheduleState, TicketState } from '../../types';
+import { getServices, createBooking, rescheduleMyBooking, getTakenSlots, getBusinessSettings, getProfessionals } from '../../services/dataService';
 import { useBusiness } from '../../services/BusinessContext';
 import { getCategory } from '../../services/categories';
 import { DEFAULT_SETTINGS, DEFAULT_WAIVER_TEXT } from '../../constants';
 import { formatMXN, formatDateShort, formatTime, isValidMexicanPhone, dateToNoonIso } from '../../services/format';
 import { ticketDateText } from '../../services/ticket';
 import { effectiveSchedule, generateTimeSlots, freeSpots, toMinutes } from '../../services/slots';
-import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, Loader2, MapPin, RefreshCw } from 'lucide-react';
+import ProAvatar from '../../components/ProAvatar';
+import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Users, Ban, Loader2, MapPin, RefreshCw } from 'lucide-react';
+
+// Pasos de la reserva: sucursal (solo si hay varias) -> servicios -> profesional (solo si el negocio tiene) -> fecha y hora -> datos
+type Step = 'location' | 'services' | 'pro' | 'time' | 'details';
 
 const BookingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,8 +22,7 @@ const BookingPage: React.FC = () => {
   const { business, path, locations } = useBusiness();
   // Con varias sucursales el primer paso es elegir una; con una sola se usa esa sin preguntar
   const needsLocation = locations.length > 1;
-  const stepShift = needsLocation ? 1 : 0;
-  const [step, setStep] = useState(reschedule ? 2 : needsLocation ? 0 : 1);
+  const [step, setStep] = useState<Step>(reschedule ? 'time' : needsLocation ? 'location' : 'services');
   const [selectedLocation, setSelectedLocation] = useState<BusinessLocation | null>(
     reschedule && reschedule.ticket.locationId
       ? locations.find(l => l.id === reschedule.ticket.locationId) ?? null
@@ -27,6 +30,9 @@ const BookingPage: React.FC = () => {
   );
   const [waiverAccepted, setWaiverAccepted] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  // Con quién: el id del profesional, o 'any' si le da igual (se asigna al primero que tenga lugar)
+  const [proChoice, setProChoice] = useState<string | null>(null);
   const [selectedServices, setSelectedServices] = useState<Service[]>(reschedule ? reschedule.ticket.services : []);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string>('');
@@ -36,7 +42,7 @@ const BookingPage: React.FC = () => {
   const [formError, setFormError] = useState('');
 
   // Horarios disponibles y configuración
-  const [availableSlots, setAvailableSlots] = useState<{ time: string; free: number }[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<{ time: string; free: number; pro: Professional | null }[]>([]);
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [settings, setSettings] = useState<BusinessSettings>(DEFAULT_SETTINGS);
   const [loadingData, setLoadingData] = useState(true);
@@ -48,14 +54,16 @@ const BookingPage: React.FC = () => {
       setLoadError(false);
       try {
           // Solo se piden los horarios ocupados (sin nombres ni celulares de otros clientes)
-          const [fetchedServices, fetchedBookings, fetchedSettings] = await Promise.all([
+          const [fetchedServices, fetchedBookings, fetchedSettings, fetchedPros] = await Promise.all([
               getServices(business.id),
               getTakenSlots(business.id),
-              getBusinessSettings(business.id)
+              getBusinessSettings(business.id),
+              getProfessionals(business.id)
           ]);
           setServices(fetchedServices);
           setAllBookings(fetchedBookings);
           setSettings(fetchedSettings);
+          setProfessionals(fetchedPros);
       } catch (error) {
           console.error("Error al cargar los datos iniciales", error);
           setLoadError(true);
@@ -68,40 +76,40 @@ const BookingPage: React.FC = () => {
     initData();
   }, []);
 
-  // Horario, descanso y lugares por horario de la sucursal elegida (o del negocio, si no tiene sucursales)
-  const schedule = effectiveSchedule(selectedLocation, settings);
+  // Profesionales que atienden en la sucursal elegida (los que no tienen sucursal atienden en todas)
+  const visiblePros = professionals.filter(p => p.active && (!p.locationId || p.locationId === selectedLocation?.id));
+  const hasPros = visiblePros.length > 0;
+
+  // Al reagendar el profesional es el de la cita; si ya no atiende, no se puede reagendar
+  const reschedulePro = reschedule?.ticket.professionalId
+    ? professionals.find(p => p.id === reschedule.ticket.professionalId && p.active) ?? null
+    : null;
+  const selectedPro: Professional | null = reschedule
+    ? reschedulePro
+    : proChoice && proChoice !== 'any' ? visiblePros.find(p => p.id === proChoice) ?? null : null;
+  const anyPro = !reschedule && proChoice === 'any';
+
+  // Pasos que se van a recorrer, para decir "Paso 2 de 4" y saber cuál sigue y cuál es el anterior
+  const flow: Step[] = [...(needsLocation ? ['location' as Step] : []), 'services', ...(hasPros ? ['pro' as Step] : []), 'time', 'details'];
+  const stepLabel = (s: Step) => `Paso ${flow.indexOf(s) + 1} de ${flow.length}`;
+  const goNext = (from: Step) => setStep(flow[flow.indexOf(from) + 1] ?? 'details');
+  const goBack = (from: Step) => setStep(flow[Math.max(flow.indexOf(from) - 1, 0)]);
+
+  // Horario, descanso y lugares por horario del profesional elegido, de la sucursal o del negocio
+  const schedule = effectiveSchedule(selectedLocation, settings, selectedPro);
 
   // Servicios que se ofrecen en la sucursal elegida (los que no tienen sucursal se ofrecen en todas)
   const visibleServices = services.filter(s => !s.locationId || s.locationId === selectedLocation?.id);
 
-  // Actualiza los horarios disponibles cuando cambia la fecha, la sucursal o las citas
+  // Actualiza los horarios disponibles cuando cambia la fecha, la sucursal, el profesional o las citas
   useEffect(() => {
     if (loadingData) return;
 
     const dateString = selectedDate.toDateString();
     const dayOfWeek = selectedDate.getDay(); // 0 (domingo) a 6 (sábado)
 
-    // ¿Es día de descanso?
-    if (schedule.offDays.includes(dayOfWeek)) {
-        setIsDayOff(true);
-        setAvailableSlots([]);
-        setSelectedTime('');
-        return;
-    } else {
-        setIsDayOff(false);
-    }
-
-    // Citas del día seleccionado en esta sucursal
-    let dayBookings = allBookings.filter(b =>
-        new Date(b.date).toDateString() === dateString && (b.locationId ?? null) === (selectedLocation?.id ?? null)
-    );
-
-    // Al reagendar, la cita actual se va a quitar: su horario no debe contar como ocupado
-    const isOwnDay = !!reschedule && new Date(reschedule.ticket.date).toDateString() === dateString;
-    if (isOwnDay && reschedule) {
-        const own = dayBookings.findIndex(b => b.timeSlot === reschedule.ticket.timeSlot);
-        if (own >= 0) dayBookings = dayBookings.filter((_, i) => i !== own);
-    }
+    // Con profesionales se revisa la agenda de cada uno ("cualquiera" junta las de todos); sin ellos, la de la sucursal
+    const candidates: (Professional | null)[] = hasPros ? (selectedPro ? [selectedPro] : visiblePros) : [null];
 
     // La duración de lo que el cliente eligió también cuenta: un servicio de 2 horas
     // no debe caber en un hueco de 30 minutos.
@@ -110,14 +118,54 @@ const BookingPage: React.FC = () => {
         schedule.slotInterval
     );
 
-    // Un horario sigue disponible mientras queden lugares: en cada momento de la cita
-    // puede haber hasta "capacity" citas a la vez (con capacity 1 es una cita a la vez).
-    let free = generateTimeSlots(schedule)
-        .map(time => ({
-            time,
-            free: freeSpots(toMinutes(time), neededMinutes, schedule.capacity, dayBookings, schedule.slotInterval)
-        }))
-        .filter(slot => slot.free > 0);
+    // Al reagendar, la cita actual se va a quitar: su horario no debe contar como ocupado
+    const isOwnDay = !!reschedule && new Date(reschedule.ticket.date).toDateString() === dateString;
+
+    // Horarios libres de un día para un profesional (null = día de descanso)
+    const slotsFor = (pro: Professional | null) => {
+        const sch = effectiveSchedule(selectedLocation, settings, pro);
+        if (sch.offDays.includes(dayOfWeek)) return null;
+
+        // Citas del día: las del profesional o, si no hay profesionales, las de la sucursal
+        let dayBookings = allBookings.filter(b =>
+            new Date(b.date).toDateString() === dateString &&
+            (pro ? b.professionalId === pro.id : (b.locationId ?? null) === (selectedLocation?.id ?? null))
+        );
+        if (isOwnDay && reschedule) {
+            const own = dayBookings.findIndex(b => b.timeSlot === reschedule.ticket.timeSlot);
+            if (own >= 0) dayBookings = dayBookings.filter((_, i) => i !== own);
+        }
+
+        // Un horario sigue disponible mientras queden lugares: en cada momento de la cita
+        // puede haber hasta "capacity" citas a la vez (con un profesional es una a la vez).
+        return generateTimeSlots(sch)
+            .map(time => ({
+                time,
+                free: freeSpots(toMinutes(time), neededMinutes, sch.capacity, dayBookings, sch.slotInterval),
+                pro
+            }))
+            .filter(slot => slot.free > 0);
+    };
+
+    const perCandidate = candidates.map(slotsFor);
+
+    // ¿Es día de descanso? (con "cualquiera", solo si nadie atiende ese día)
+    if (perCandidate.every(r => r === null)) {
+        setIsDayOff(true);
+        setAvailableSlots([]);
+        setSelectedTime('');
+        return;
+    }
+    setIsDayOff(false);
+
+    // Cada horario aparece una vez; si varios profesionales lo tienen libre, se asigna el primero
+    const merged = new Map<string, { time: string; free: number; pro: Professional | null }>();
+    for (const result of perCandidate) {
+        for (const slot of result ?? []) {
+            if (!merged.has(slot.time)) merged.set(slot.time, slot);
+        }
+    }
+    let free = Array.from(merged.values()).sort((a, b) => toMinutes(a.time) - toMinutes(b.time));
 
     // Al reagendar no tiene caso ofrecer el mismo horario que ya tiene
     if (isOwnDay && reschedule) free = free.filter(slot => slot.time !== reschedule.ticket.timeSlot);
@@ -142,15 +190,27 @@ const BookingPage: React.FC = () => {
     if (selectedTime && !free.some(slot => slot.time === selectedTime)) {
         setSelectedTime('');
     }
-  }, [selectedDate, allBookings, selectedTime, settings, loadingData, selectedServices, selectedLocation]);
+  }, [selectedDate, allBookings, selectedTime, settings, loadingData, selectedServices, selectedLocation, professionals, proChoice]);
+
+  // Con quién quedó la cita: el profesional elegido o, con "cualquiera", el que tiene lugar a esa hora
+  const assignedPro: Professional | null = selectedPro ?? availableSlots.find(slot => slot.time === selectedTime)?.pro ?? null;
 
   // Elegir (o cambiar) la sucursal: los servicios que no se ofrecen ahí se quitan y la hora se vuelve a elegir
   const chooseLocation = (location: BusinessLocation) => {
     setSelectedLocation(location);
     setSelectedServices(prev => prev.filter(s => !s.locationId || s.locationId === location.id));
     setSelectedTime('');
+    setProChoice(null);
     setFormError('');
-    setStep(1);
+    setStep('services');
+  };
+
+  // Elegir (o cambiar) con quién: la hora se vuelve a elegir porque cada profesional tiene su agenda
+  const choosePro = (choice: string) => {
+    setProChoice(choice);
+    setSelectedTime('');
+    setFormError('');
+    setStep('time');
   };
 
   // Sucursal elegida, para recordarlo en los pasos siguientes (solo cuando hay varias)
@@ -198,7 +258,8 @@ const BookingPage: React.FC = () => {
           totalDuration,
           date: selectedDate.toISOString(),
           timeSlot: selectedTime,
-          locationId: selectedLocation?.id ?? null
+          locationId: selectedLocation?.id ?? null,
+          professionalId: assignedPro?.id ?? null
         }, waiverAccepted);
 
         // Ir al ticket de la cita
@@ -214,7 +275,9 @@ const BookingPage: React.FC = () => {
             locationAddress: selectedLocation?.address,
             locationMapsUrl: selectedLocation?.mapsUrl,
             folio: created.folio,
-            waiverAccepted
+            waiverAccepted,
+            professionalId: assignedPro?.id ?? null,
+            professionalName: assignedPro?.name
         };
         const ticketState: TicketState = { ticket, phone: customerPhone.trim(), customerName: customerName.trim() };
         navigate(path('/success'), { state: ticketState });
@@ -229,12 +292,23 @@ const BookingPage: React.FC = () => {
             console.error('No se pudieron actualizar los horarios', refreshError);
           }
           setSelectedTime('');
-          setStep(2);
+          setStep('time');
           setFormError('Ese horario ya se ocupó. Elige otro, por favor.');
         } else if (code === 'waiver_required') {
           setFormError('Para reservar necesitas aceptar el deslinde.');
+        } else if (code === 'professional_required' || code === 'invalid_professional') {
+          // El profesional ya no atiende (o el negocio agregó profesionales): se actualiza la lista y se vuelve a elegir
+          try {
+            setProfessionals(await getProfessionals(business.id));
+          } catch (refreshError) {
+            console.error('No se pudieron actualizar los profesionales', refreshError);
+          }
+          setProChoice(null);
+          setSelectedTime('');
+          setStep('pro');
+          setFormError('Elige con quién quieres tu cita.');
         } else if (code === 'location_required' || code === 'invalid_location') {
-          setStep(needsLocation ? 0 : 1);
+          setStep(needsLocation ? 'location' : 'services');
           setFormError('Elige una sucursal para continuar.');
         } else if (code === 'invalid_services') {
           try {
@@ -243,7 +317,7 @@ const BookingPage: React.FC = () => {
             console.error('No se pudieron actualizar los servicios', refreshError);
           }
           setSelectedServices([]);
-          setStep(1);
+          setStep('services');
           setFormError('Alguno de los servicios ya no está disponible. Elígelos de nuevo, por favor.');
         } else if (code === 'invalid_phone') {
           setFormError('Escribe un número de celular válido de 10 dígitos.');
@@ -372,13 +446,33 @@ const BookingPage: React.FC = () => {
     );
   }
 
-  // --- Paso 0 (solo si hay varias sucursales): elegir sucursal ---
-  if (step === 0) {
+  // Al reagendar, si el profesional de la cita ya no atiende (o la cita es anterior a los profesionales) no se puede calcular su agenda
+  if (reschedule && ((reschedule.ticket.professionalId && !reschedulePro) || (!reschedule.ticket.professionalId && hasPros))) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center gap-4 px-6">
+        <p className="text-slate-300">
+          {reschedule.ticket.professionalName
+            ? `${reschedule.ticket.professionalName} ya no atiende en este horario.`
+            : 'Esta cita se hizo antes de que se pudiera elegir con quién.'}{' '}
+          Cancela esta cita y reserva de nuevo, por favor.
+        </p>
+        <button
+          onClick={() => navigate(-1)}
+          className="sticker bg-amber-500 text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400"
+        >
+          Volver
+        </button>
+      </div>
+    );
+  }
+
+  // --- Paso (solo si hay varias sucursales): elegir sucursal ---
+  if (step === 'location') {
     return (
       <div className="space-y-6 animate-in slide-in-from-right-4 pb-24">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white">Elige tu sucursal</h2>
-          <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso 1 de {3 + stepShift}</span>
+          <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">{stepLabel('location')}</span>
         </div>
 
         {formError && (
@@ -413,12 +507,12 @@ const BookingPage: React.FC = () => {
     );
   }
 
-  // --- Paso 1: elegir servicios ---
-  if (step === 1) {
+  // --- Paso: elegir servicios ---
+  if (step === 'services') {
     return (
       <div className="space-y-6 animate-in slide-in-from-right-4 pb-40 md:pb-0">
         {needsLocation && (
-          <button onClick={() => setStep(0)} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
+          <button onClick={() => setStep('location')} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
             <ChevronLeft size={16} /> Cambiar de sucursal
           </button>
         )}
@@ -426,7 +520,7 @@ const BookingPage: React.FC = () => {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-white">Elige tus servicios</h2>
-            <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso {1 + stepShift} de {3 + stepShift}</span>
+            <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">{stepLabel('services')}</span>
           </div>
           {locationBadge}
         </div>
@@ -474,7 +568,7 @@ const BookingPage: React.FC = () => {
                 </div>
                 <button
                     disabled={selectedServices.length === 0}
-                    onClick={() => setStep(2)}
+                    onClick={() => { setFormError(''); goNext('services'); }}
                     className="sticker bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400 flex items-center gap-2"
                 >
                     Continuar
@@ -486,8 +580,73 @@ const BookingPage: React.FC = () => {
     );
   }
 
-  // --- Paso 2: fecha y hora ---
-  if (step === 2) {
+  // --- Paso (solo si el negocio tiene profesionales): elegir con quién ---
+  if (step === 'pro') {
+    return (
+      <div className="space-y-6 animate-in slide-in-from-right-4 pb-24">
+        <button onClick={() => { setFormError(''); goBack('pro'); }} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
+          <ChevronLeft size={16} /> Atrás
+        </button>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-white">Elige con quién</h2>
+            <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">{stepLabel('pro')}</span>
+          </div>
+          {locationBadge}
+        </div>
+
+        {formError && (
+          <p className="text-red-500 text-sm text-center bg-red-500/10 py-3 rounded-xl border border-red-500/20">{formError}</p>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {visiblePros.map(pro => {
+            const isSelected = proChoice === pro.id;
+            return (
+              <button
+                key={pro.id}
+                onClick={() => choosePro(pro.id)}
+                className={`text-left p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${
+                  isSelected
+                    ? 'border-amber-500 bg-amber-500/10 pop-accent'
+                    : 'border-slate-800 hover:border-amber-500/60 bg-slate-900'
+                }`}
+              >
+                <ProAvatar name={pro.name} photoUrl={pro.photoUrl} className="w-20 h-20 rounded-2xl" />
+                <div className="min-w-0">
+                  <h3 className="font-display uppercase tracking-wide text-2xl text-white leading-tight">{pro.name}</h3>
+                  {pro.title && <p className="text-sm text-slate-400 mt-1">{pro.title}</p>}
+                </div>
+              </button>
+            );
+          })}
+
+          {visiblePros.length > 1 && (
+            <button
+              onClick={() => choosePro('any')}
+              className={`text-left p-4 rounded-2xl border-2 border-dashed transition-all flex items-center gap-4 ${
+                proChoice === 'any'
+                  ? 'border-amber-500 bg-amber-500/10'
+                  : 'border-slate-700 hover:border-amber-500/60 bg-slate-900/50'
+              }`}
+            >
+              <span className="w-20 h-20 rounded-2xl bg-slate-800 text-amber-500 flex items-center justify-center shrink-0">
+                <Users size={32} aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="font-display uppercase tracking-wide text-2xl text-white leading-tight">Cualquiera disponible</h3>
+                <p className="text-sm text-slate-400 mt-1">Más horarios para elegir</p>
+              </div>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Paso: fecha y hora ---
+  if (step === 'time') {
       const dates = Array.from({length: 14}, (_, i) => {
           const d = new Date();
           d.setDate(d.getDate() + i);
@@ -496,7 +655,7 @@ const BookingPage: React.FC = () => {
 
       return (
         <div className="space-y-8 pb-40 md:pb-24 animate-in slide-in-from-right-4">
-            <button onClick={() => (reschedule ? navigate(-1) : setStep(1))} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
+            <button onClick={() => (reschedule ? navigate(-1) : goBack('time'))} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
                 <ChevronLeft size={16} /> {reschedule ? 'Volver a mi ticket' : 'Atrás'}
             </button>
 
@@ -504,15 +663,24 @@ const BookingPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-bold text-white">{reschedule ? 'Reagendar tu cita' : 'Elige fecha y hora'}</h2>
                     {!reschedule && (
-                        <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso {2 + stepShift} de {3 + stepShift}</span>
+                        <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">{stepLabel('time')}</span>
                     )}
                 </div>
                 {locationBadge}
+                {(selectedPro || anyPro) && (
+                    <p className="flex items-center gap-2 text-sm text-slate-400">
+                        {selectedPro
+                            ? <ProAvatar name={selectedPro.name} photoUrl={selectedPro.photoUrl} className="w-7 h-7 rounded-full" />
+                            : <Users size={14} className="text-amber-500" aria-hidden="true" />}
+                        {selectedPro ? `Con ${selectedPro.name}` : 'Con cualquiera disponible'}
+                    </p>
+                )}
                 {reschedule && (
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-sm space-y-1">
                         <p className="text-slate-500">Tu cita actual</p>
                         <p className="text-slate-200 font-medium">{ticketDateText(reschedule.ticket)}, {formatTime(reschedule.ticket.timeSlot)}</p>
                         <p className="text-slate-400">{reschedule.ticket.services.map(s => s.title).join(', ')}</p>
+                        {reschedule.ticket.professionalName && <p className="text-slate-400">Con {reschedule.ticket.professionalName}</p>}
                     </div>
                 )}
             </div>
@@ -560,7 +728,7 @@ const BookingPage: React.FC = () => {
                 {isDayOff ? (
                     <div className="p-12 text-center border-2 border-dashed border-red-500/30 rounded-2xl text-red-400 bg-red-500/5 flex flex-col items-center gap-3">
                         <Ban size={32} />
-                        <span className="font-bold text-lg">El negocio está cerrado este día.</span>
+                        <span className="font-bold text-lg">{selectedPro ? `${selectedPro.name} no atiende este día.` : 'El negocio está cerrado este día.'}</span>
                         <span className="text-sm text-red-300">Elige otro día, por favor.</span>
                     </div>
                 ) : availableSlots.length === 0 ? (
@@ -569,7 +737,7 @@ const BookingPage: React.FC = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                        {availableSlots.map(({ time, free }) => (
+                        {availableSlots.map(({ time, free, pro }) => (
                             <button
                                 key={time}
                                 onClick={() => { setSelectedTime(time); setFormError(''); }}
@@ -580,8 +748,11 @@ const BookingPage: React.FC = () => {
                                 }`}
                             >
                                 {formatTime(time)}
-                                {schedule.capacity > 1 && (
+                                {!hasPros && schedule.capacity > 1 && (
                                     <span className="block text-[11px] font-normal opacity-70">{free === 1 ? '1 lugar' : `${free} lugares`}</span>
+                                )}
+                                {anyPro && pro && (
+                                    <span className="block text-[11px] font-normal opacity-70 truncate">{pro.name.split(/\s+/)[0]}</span>
                                 )}
                             </button>
                         ))}
@@ -606,7 +777,7 @@ const BookingPage: React.FC = () => {
                     ) : (
                         <button
                             disabled={!selectedTime}
-                            onClick={() => setStep(3)}
+                            onClick={() => { setFormError(''); goNext('time'); }}
                             className="sticker bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400 flex items-center gap-2"
                         >
                             Continuar
@@ -619,16 +790,16 @@ const BookingPage: React.FC = () => {
       );
   }
 
-  // --- Paso 3: datos y confirmación ---
+  // --- Paso: datos y confirmación ---
   return (
     <div className="space-y-6 pb-24 animate-in slide-in-from-right-4">
-        <button onClick={() => { setFormError(''); setStep(2); }} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
+        <button onClick={() => { setFormError(''); goBack('details'); }} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
             <ChevronLeft size={16} /> Atrás
         </button>
 
         <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-white">Tus datos</h2>
-            <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso {3 + stepShift} de {3 + stepShift}</span>
+            <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">{stepLabel('details')}</span>
         </div>
 
         <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
@@ -670,6 +841,12 @@ const BookingPage: React.FC = () => {
                  <div className="flex justify-between text-sm gap-4">
                      <span className="text-slate-400">Sucursal:</span>
                      <span className="font-medium text-slate-200 text-right">{selectedLocation.name}</span>
+                 </div>
+             )}
+             {assignedPro && (
+                 <div className="flex justify-between text-sm gap-4">
+                     <span className="text-slate-400">Con:</span>
+                     <span className="font-medium text-slate-200 text-right">{assignedPro.name}</span>
                  </div>
              )}
              <div className="flex justify-between text-sm gap-4">

@@ -427,7 +427,7 @@ export const applyTheme = (business: Pick<Business, 'theme' | 'category' | 'bran
 // Dirección de una imagen del negocio: completa (https://...) o dentro de la app (demos/logo.svg)
 export const assetUrl = (value: string): string => {
   if (!value) return '';
-  if (/^https?:\/\//i.test(value)) return value;
+  if (/^https?:\/\//i.test(value) || /^data:image\//i.test(value)) return value;
   const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
   return base + value.replace(/^\/+/, '');
 };

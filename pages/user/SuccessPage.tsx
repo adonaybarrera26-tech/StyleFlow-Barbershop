@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CheckCircle2, MapPin, Calendar, Clock, Navigation, MessageCircle, CalendarPlus, Download, RefreshCw, Loader2 } from 'lucide-react';
+import { CheckCircle2, MapPin, Calendar, Clock, Navigation, MessageCircle, CalendarPlus, Download, RefreshCw, Loader2, User } from 'lucide-react';
 import { TicketState } from '../../types';
 import { useBusiness } from '../../services/BusinessContext';
 import { cancelMyBooking } from '../../services/dataService';
@@ -152,6 +152,12 @@ const SuccessPage: React.FC = () => {
               <div className="flex justify-between items-start gap-4">
                 <span className="text-slate-500 text-sm flex items-center gap-1 shrink-0"><MapPin size={14} aria-hidden="true" /> Sucursal</span>
                 <span className="text-white font-bold text-right">{ticket.locationName}</span>
+              </div>
+            )}
+            {ticket.professionalName && (
+              <div className="flex justify-between items-start gap-4">
+                <span className="text-slate-500 text-sm flex items-center gap-1 shrink-0"><User size={14} aria-hidden="true" /> Con</span>
+                <span className="text-white font-bold text-right">{ticket.professionalName}</span>
               </div>
             )}
             <div className="flex justify-between items-start gap-4">

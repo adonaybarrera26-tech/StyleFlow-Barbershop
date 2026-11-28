@@ -17,7 +17,7 @@ export const WEEK_DAYS = [
 
 const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
 
-const inputClass =
+export const inputClass =
   'w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-amber-500 outline-none';
 
 // Lo que se edita en el formulario: lo que la sucursal deja "igual que el negocio" se guarda como vacío (null)
@@ -80,7 +80,7 @@ interface Props {
   onError: (error: unknown, message: string) => void;
 }
 
-const HourSelect: React.FC<{
+export const HourSelect: React.FC<{
   id: string;
   label: string;
   value: string;

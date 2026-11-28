@@ -157,6 +157,38 @@ alter table public.bookings add column if not exists location_id uuid references
 alter table public.bookings add column if not exists waiver_accepted_at timestamptz;
 create index if not exists bookings_business_date_idx on public.bookings (business_id, booking_date);
 
+-- Profesionales del negocio (barberos, instructoras, doctores...). Cada uno tiene su foto y su propia agenda:
+-- una cita con un profesional solo choca con las demás citas de ese mismo profesional.
+-- location_id vacío = trabaja en todas las sucursales. Lo que quede en blanco (null) usa lo de la sucursal o del negocio.
+create table if not exists public.professionals (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  location_id uuid references public.locations(id) on delete set null,
+  name text not null check (char_length(name) between 1 and 80),
+  title text not null default '' check (char_length(title) <= 60),
+  photo_url text not null default '' check (
+    char_length(photo_url) <= 150000 and (
+      photo_url = ''
+      or photo_url ~* '^https?://[^ ]+$'
+      or photo_url ~ '^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$'
+      or photo_url ~ '^[A-Za-z0-9_./-]+$'
+    )
+  ),
+  work_start text check (work_start is null or work_start ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  work_end text check (work_end is null or work_end ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  break_start text check (break_start is null or break_start ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  break_end text check (break_end is null or break_end ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  off_days integer[],
+  sort_order integer not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create index if not exists professionals_business_idx on public.professionals (business_id);
+
+-- La cita guarda con qué profesional es
+alter table public.bookings add column if not exists professional_id uuid references public.professionals(id) on delete set null;
+create index if not exists bookings_professional_idx on public.bookings (professional_id, booking_date);
+
 -- Folio de la cita (4 letras, ej. RDRY): el cliente lo ve en su ticket y el negocio lo busca en el panel
 alter table public.bookings add column if not exists folio text;
 create unique index if not exists bookings_folio_idx on public.bookings (business_id, folio) where folio is not null;
@@ -314,6 +346,7 @@ alter table public.bookings enable row level security;
 alter table public.admins enable row level security;         -- sin políticas: nadie la lee directo
 alter table public.notify_chats enable row level security;   -- sin políticas: nadie la lee directo
 alter table public.locations enable row level security;
+alter table public.professionals enable row level security;
 
 -- Negocios: los ven todos (solo los activos). Se crean y cambian desde el editor SQL.
 drop policy if exists "businesses_select" on public.businesses;
@@ -373,6 +406,21 @@ create policy "locations_update" on public.locations
   for update to authenticated
   using (public.is_business_admin(business_id)) with check (public.is_business_admin(business_id));
 
+-- Profesionales: los ve cualquiera (nombre, foto y puesto son públicos); solo el admin de ese negocio los crea y cambia.
+-- No se borran: se ocultan (active = false) para no perder el historial de sus citas.
+drop policy if exists "professionals_select" on public.professionals;
+create policy "professionals_select" on public.professionals
+  for select to anon, authenticated using (true);
+
+drop policy if exists "professionals_insert" on public.professionals;
+create policy "professionals_insert" on public.professionals
+  for insert to authenticated with check (public.is_business_admin(business_id));
+
+drop policy if exists "professionals_update" on public.professionals;
+create policy "professionals_update" on public.professionals
+  for update to authenticated
+  using (public.is_business_admin(business_id)) with check (public.is_business_admin(business_id));
+
 -- Citas: solo el admin de ese negocio las ve y las cancela. Los clientes NO tienen acceso directo.
 drop policy if exists "bookings_select" on public.bookings;
 create policy "bookings_select" on public.bookings
@@ -386,14 +434,17 @@ create policy "bookings_delete" on public.bookings
 -- (las reglas de arriba deciden además qué filas se ven). Las columnas business_id
 -- e id nunca se pueden modificar desde la app.
 revoke all on public.businesses, public.services, public.settings, public.bookings,
-  public.admins, public.notify_chats, public.locations from anon, authenticated;
+  public.admins, public.notify_chats, public.locations, public.professionals from anon, authenticated;
 grant usage on schema public to anon, authenticated;
-grant select on public.businesses, public.services, public.settings, public.locations to anon, authenticated;
+grant select on public.businesses, public.services, public.settings, public.locations, public.professionals to anon, authenticated;
 grant insert, delete on public.services to authenticated;
 grant update (title, price, duration_minutes, description, sort_order, location_id) on public.services to authenticated;
 grant update (work_start, work_end, break_start, break_end, off_days, slot_interval, max_bookings_per_phone,
   capacity, waiver_enabled, waiver_text)
   on public.settings to authenticated;
+grant insert on public.professionals to authenticated;
+grant update (location_id, name, title, photo_url, work_start, work_end, break_start, break_end, off_days, sort_order, active)
+  on public.professionals to authenticated;
 grant insert on public.locations to authenticated;
 grant update (name, address, maps_url, capacity, work_start, work_end, break_start, break_end, off_days,
   slot_interval, sort_order, active)
@@ -419,15 +470,18 @@ $$;
 
 grant execute on function public.get_taken_slots(uuid, date) to anon, authenticated;
 
--- Igual que la anterior, pero dice en qué sucursal es cada cita (la pantalla de reservas la usa para contar el cupo)
+-- Igual que la anterior, pero dice en qué sucursal y con qué profesional es cada cita (la pantalla de reservas la usa para contar el cupo)
+-- Cambió la lista de datos (ahora dice el profesional): se quita la versión anterior
+drop function if exists public.get_booked_slots(uuid, date);
+
 create or replace function public.get_booked_slots(p_business uuid, p_from date default current_date)
-returns table (booking_date date, time_slot text, total_duration integer, location_id uuid)
+returns table (booking_date date, time_slot text, total_duration integer, location_id uuid, professional_id uuid)
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select b.booking_date, b.time_slot, b.total_duration, b.location_id
+  select b.booking_date, b.time_slot, b.total_duration, b.location_id, b.professional_id
   from public.bookings b
   where b.business_id = p_business
     and b.booking_date >= p_from
@@ -439,12 +493,14 @@ grant execute on function public.get_booked_slots(uuid, date) to anon, authentic
 
 -- 6) CREAR UNA CITA (validada en el servidor, sin citas dobles) -----------
 
--- Cambió la lista de datos: se quita la versión anterior (la nueva acepta las mismas llamadas de antes)
+-- Cambió la lista de datos: se quitan las versiones anteriores (la nueva acepta las mismas llamadas de antes)
 drop function if exists public.create_booking(uuid, text, text, uuid[], date, text);
+drop function if exists public.create_booking(uuid, text, text, uuid[], date, text, uuid, boolean);
 
 -- p_location: la sucursal elegida (si el negocio tiene varias es obligatorio; si tiene una, se usa esa).
 -- p_waiver: true si el cliente aceptó el deslinde (obligatorio solo si el negocio lo pide).
--- Cupo: en cada instante puede haber hasta "capacity" citas en la misma sucursal.
+-- p_professional: el profesional elegido (si el negocio tiene profesionales en esa sucursal es obligatorio).
+-- Cupo: en cada instante puede haber hasta "capacity" citas en la misma sucursal; con un profesional, una a la vez (la suya).
 create or replace function public.create_booking(
   p_business uuid,
   p_name text,
@@ -453,7 +509,8 @@ create or replace function public.create_booking(
   p_date date,
   p_time_slot text,
   p_location uuid default null,
-  p_waiver boolean default false
+  p_waiver boolean default false,
+  p_professional uuid default null
 )
 returns uuid
 language plpgsql
@@ -474,6 +531,8 @@ declare
   v_loc public.locations%rowtype;
   v_location uuid;
   v_nloc integer;
+  v_pro public.professionals%rowtype;
+  v_npro integer;
   v_work_start text;
   v_work_end text;
   v_break_start text;
@@ -527,6 +586,24 @@ begin
     raise exception 'location_required';
   end if;
 
+  -- Profesional: si el negocio tiene profesionales en esta sucursal hay que elegir uno (de esa sucursal o de todas)
+  select count(*) into v_npro
+  from public.professionals p
+  where p.business_id = p_business and p.active
+    and (p.location_id is null or p.location_id is not distinct from v_location);
+
+  if p_professional is not null then
+    select * into v_pro
+    from public.professionals p
+    where p.id = p_professional and p.business_id = p_business and p.active
+      and (p.location_id is null or p.location_id is not distinct from v_location);
+    if not found then
+      raise exception 'invalid_professional';
+    end if;
+  elsif v_npro > 0 then
+    raise exception 'professional_required';
+  end if;
+
   -- Servicios: deben ser de ESTE negocio (y de todas las sucursales o de la elegida).
   -- El precio y la duración se calculan aquí, no los manda el cliente
   select
@@ -557,19 +634,23 @@ begin
     raise exception 'invalid_services';
   end if;
 
-  -- Horario, días de descanso y cupo: lo de la sucursal si lo tiene; si no, lo del negocio
-  v_work_start := coalesce(v_loc.work_start, v_set.work_start);
-  v_work_end := coalesce(v_loc.work_end, v_set.work_end);
-  if v_loc.work_start is not null then
-    -- si la sucursal define su horario, también define su descanso (puede ser "sin descanso")
+  -- Horario, días de descanso y cupo: lo del profesional si lo tiene; si no, lo de la sucursal; si no, lo del negocio
+  v_work_start := coalesce(v_pro.work_start, v_loc.work_start, v_set.work_start);
+  v_work_end := coalesce(v_pro.work_end, v_loc.work_end, v_set.work_end);
+  if v_pro.work_start is not null then
+    -- si el profesional define su horario, también define su descanso (puede ser "sin descanso")
+    v_break_start := v_pro.break_start;
+    v_break_end := v_pro.break_end;
+  elsif v_loc.work_start is not null then
     v_break_start := v_loc.break_start;
     v_break_end := v_loc.break_end;
   else
     v_break_start := v_set.break_start;
     v_break_end := v_set.break_end;
   end if;
-  v_off := coalesce(v_loc.off_days, v_set.off_days);
-  v_capacity := coalesce(v_loc.capacity, v_set.capacity, 1);
+  v_off := coalesce(v_pro.off_days, v_loc.off_days, v_set.off_days);
+  -- un profesional atiende a una persona a la vez
+  v_capacity := case when v_pro.id is not null then 1 else coalesce(v_loc.capacity, v_set.capacity, 1) end;
 
   if v_off is not null and extract(dow from p_date)::integer = any(v_off) then
     raise exception 'day_off';
@@ -607,6 +688,10 @@ begin
 
   -- Una cita a la vez por día y sucursal, para que dos personas no se queden con el último lugar
   perform pg_advisory_xact_lock(hashtext('bookings:' || p_business::text || ':' || p_date::text || ':' || coalesce(v_location::text, '')));
+  -- y una a la vez por día y profesional (puede trabajar en varias sucursales)
+  if v_pro.id is not null then
+    perform pg_advisory_xact_lock(hashtext('pro:' || v_pro.id::text || ':' || p_date::text));
+  end if;
 
   -- Cupo: se revisa el momento de inicio y el inicio de cada cita que empieza durante esta;
   -- si en alguno ya están todos los lugares ocupados, el horario no está disponible
@@ -619,7 +704,7 @@ begin
       from public.bookings b
       where b.business_id = p_business
         and b.booking_date = p_date
-        and b.location_id is not distinct from v_location
+        and (case when v_pro.id is not null then b.professional_id = v_pro.id else b.location_id is not distinct from v_location end)
         and (split_part(b.time_slot, ':', 1)::integer * 60 + split_part(b.time_slot, ':', 2)::integer) > v_start
         and (split_part(b.time_slot, ':', 1)::integer * 60 + split_part(b.time_slot, ':', 2)::integer) < v_end
     ) pts
@@ -628,7 +713,7 @@ begin
       from public.bookings b2
       where b2.business_id = p_business
         and b2.booking_date = p_date
-        and b2.location_id is not distinct from v_location
+        and (case when v_pro.id is not null then b2.professional_id = v_pro.id else b2.location_id is not distinct from v_location end)
         and (split_part(b2.time_slot, ':', 1)::integer * 60 + split_part(b2.time_slot, ':', 2)::integer) <= pts.t
         and (split_part(b2.time_slot, ':', 1)::integer * 60 + split_part(b2.time_slot, ':', 2)::integer + b2.total_duration) > pts.t
     ) >= v_capacity
@@ -638,11 +723,12 @@ begin
 
   insert into public.bookings (
     business_id, customer_name, customer_phone, services, total_price, total_duration, booking_date, time_slot,
-    location_id, waiver_accepted_at
+    location_id, waiver_accepted_at, professional_id
   ) values (
     p_business, trim(p_name), trim(p_phone), v_services, v_price, v_duration, p_date, p_time_slot,
     v_location,
-    case when coalesce(v_set.waiver_enabled, false) then now() else null end
+    case when coalesce(v_set.waiver_enabled, false) then now() else null end,
+    v_pro.id
   )
   returning id into v_id;
 
@@ -650,7 +736,7 @@ begin
 end;
 $$;
 
-grant execute on function public.create_booking(uuid, text, text, uuid[], date, text, uuid, boolean) to anon, authenticated;
+grant execute on function public.create_booking(uuid, text, text, uuid[], date, text, uuid, boolean, uuid) to anon, authenticated;
 
 -- 7) MIS RESERVAS (el cliente ve y cancela sus propias citas) -------------
 -- Se busca por celular (se comparan los últimos 10 dígitos). Para no exponer
@@ -733,6 +819,7 @@ begin
     E'📅 ' || public.format_slot_es(v_row.booking_date, v_row.time_slot) || E'\n' ||
     E'✂️ ' || coalesce((select string_agg(e ->> 'title', ', ') from jsonb_array_elements(v_row.services) e), '') || E'\n' ||
     coalesce(E'📍 ' || (select l.name from public.locations l where l.id = v_row.location_id) || E'\n', '') ||
+    coalesce(E'🧑 Con ' || (select pr.name from public.professionals pr where pr.id = v_row.professional_id) || E'\n', '') ||
     coalesce(E'🎟 Folio ' || v_row.folio || E'\n', '') ||
     E'📱 ' || v_row.customer_phone
   );
@@ -842,6 +929,7 @@ begin
     E'✂️ ' || coalesce((select string_agg(e ->> 'title', ', ') from jsonb_array_elements(new.services) e), '') || E'\n' ||
     E'💵 $' || to_char(new.total_price, 'FM999,999,990') || E'\n' ||
     coalesce(E'📍 ' || (select l.name from public.locations l where l.id = new.location_id) || E'\n', '') ||
+    coalesce(E'🧑 Con ' || (select pr.name from public.professionals pr where pr.id = new.professional_id) || E'\n', '') ||
     coalesce(E'🎟 Folio ' || new.folio || E'\n', '') ||
     E'📱 ' || new.customer_phone
   );
@@ -1145,7 +1233,10 @@ $$;
 update public.bookings set folio = public.gen_folio(business_id) where folio is null;
 
 -- Los datos del ticket de las citas de un celular (de hoy en adelante). Igual que get_my_bookings,
--- pero agrega folio, dirección y mapa de la sucursal, y si ya aceptó el deslinde. No regresa nombre ni celular.
+-- pero agrega folio, dirección y mapa de la sucursal, el profesional y si ya aceptó el deslinde. No regresa nombre ni celular.
+-- Cambió la lista de datos (ahora dice el profesional): se quita la versión anterior
+drop function if exists public.get_my_tickets(uuid, text);
+
 create or replace function public.get_my_tickets(p_business uuid, p_phone text)
 returns table (
   id uuid,
@@ -1159,7 +1250,9 @@ returns table (
   location_address text,
   location_maps_url text,
   folio text,
-  waiver_accepted boolean
+  waiver_accepted boolean,
+  professional_id uuid,
+  professional_name text
 )
 language plpgsql
 stable
@@ -1176,9 +1269,11 @@ begin
 
   return query
     select b.id, b.booking_date, b.time_slot, b.services, b.total_price, b.total_duration,
-           b.location_id, l.name, l.address, l.maps_url, b.folio, (b.waiver_accepted_at is not null)
+           b.location_id, l.name, l.address, l.maps_url, b.folio, (b.waiver_accepted_at is not null),
+           b.professional_id, pr.name
     from public.bookings b
     left join public.locations l on l.id = b.location_id
+    left join public.professionals pr on pr.id = b.professional_id
     where b.business_id = p_business
       and right(regexp_replace(b.customer_phone, '\D', '', 'g'), 10) = right(v_digits, 10)
       and b.booking_date >= (now() at time zone 'America/Mexico_City')::date
@@ -1245,7 +1340,8 @@ begin
     p_date,
     p_time_slot,
     v_old.location_id,
-    coalesce(p_waiver, false) or v_old.waiver_accepted_at is not null
+    coalesce(p_waiver, false) or v_old.waiver_accepted_at is not null,
+    v_old.professional_id
   );
 
   -- conserva el folio de la cita original
@@ -1265,6 +1361,7 @@ begin
     E'Ahora: ' || public.format_slot_es(p_date, p_time_slot) || E'\n' ||
     E'✂️ ' || coalesce((select string_agg(e ->> 'title', ', ') from jsonb_array_elements(v_old.services) e), '') || E'\n' ||
     coalesce(E'📍 ' || (select l.name from public.locations l where l.id = v_old.location_id) || E'\n', '') ||
+    coalesce(E'🧑 Con ' || (select pr.name from public.professionals pr where pr.id = v_old.professional_id) || E'\n', '') ||
     coalesce(E'🎟 Folio ' || v_old.folio || E'\n', '') ||
     E'📱 ' || v_old.customer_phone
   );

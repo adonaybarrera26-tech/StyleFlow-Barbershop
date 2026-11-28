@@ -199,3 +199,46 @@ begin
   where not exists (select 1 from public.admins where business_id = v_id and email = lower(trim(v_admin)));
 end;
 $$;
+
+-- ---------------------------------------------------------------------
+-- Barbería de ejemplo (demo-barberia): tres barberos con foto y agenda propia
+-- ---------------------------------------------------------------------
+-- Las fotos son ilustraciones (public/demos/barbero-*.svg), no personas reales.
+-- Requiere que la barbería de ejemplo ya exista y haber ejecutado antes la parte de profesionales de schema.sql.
+-- Se puede repetir: deja a los tres como nuevos.
+do $$
+declare
+  v_id uuid;
+begin
+  select id into v_id from public.businesses where slug = 'demo-barberia';
+  if v_id is null then
+    return;
+  end if;
+
+  insert into public.professionals (business_id, name, sort_order)
+  select v_id, t.n, t.o
+  from (values ('Luis Hernández', 1), ('Marco Díaz', 2), ('Dani Ríos', 3)) as t(n, o)
+  where not exists (select 1 from public.professionals p where p.business_id = v_id and p.name = t.n);
+
+  -- Luis: el horario del negocio, de lunes a sábado
+  update public.professionals set
+    title = 'Fade y barba', photo_url = 'demos/barbero-luis.svg', location_id = null,
+    work_start = null, work_end = null, break_start = null, break_end = null, off_days = null,
+    sort_order = 1, active = true
+  where business_id = v_id and name = 'Luis Hernández';
+
+  -- Marco: de martes a sábado, de 12:00 a 20:00 con descanso de 15:00 a 16:00
+  update public.professionals set
+    title = 'Rizos y tijera', photo_url = 'demos/barbero-marco.svg', location_id = null,
+    work_start = '12:00', work_end = '20:00', break_start = '15:00', break_end = '16:00', off_days = '{0,1}',
+    sort_order = 2, active = true
+  where business_id = v_id and name = 'Marco Díaz';
+
+  -- Dani: de 10:00 a 18:00; descansa miércoles y domingo
+  update public.professionals set
+    title = 'Corte clásico y bigote', photo_url = 'demos/barbero-dani.svg', location_id = null,
+    work_start = '10:00', work_end = '18:00', break_start = null, break_end = null, off_days = '{0,3}',
+    sort_order = 3, active = true
+  where business_id = v_id and name = 'Dani Ríos';
+end;
+$$;
