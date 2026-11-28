@@ -6,9 +6,9 @@ import { buildWhatsAppLink, buildMapsLink } from '../services/format';
 import { useBusiness } from '../services/BusinessContext';
 
 const AboutProject: React.FC = () => {
-  const { business } = useBusiness();
-  // La tarjeta de contacto solo se muestra si el negocio capturó dirección o teléfono
-  const hasContact = Boolean(business.address || business.displayPhone);
+  const { business, locations } = useBusiness();
+  // La tarjeta de contacto solo se muestra si el negocio capturó dirección, teléfono o locales
+  const hasContact = Boolean(business.address || business.displayPhone || locations.length > 0);
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 py-8 px-4">
@@ -35,7 +35,9 @@ const AboutProject: React.FC = () => {
             <h2 className="text-xl font-bold">¿Cómo reservar?</h2>
           </div>
           <p className="text-slate-400 leading-relaxed">
-            Reserva desde tu celular en tres pasos: elige tu servicio, tu fecha y tu hora.
+            {locations.length > 1
+              ? 'Reserva desde tu celular en cuatro pasos: elige tu local, tu servicio, tu fecha y tu hora.'
+              : 'Reserva desde tu celular en tres pasos: elige tu servicio, tu fecha y tu hora.'}
           </p>
           <ul className="space-y-3 text-sm text-slate-300">
             <li className="flex items-center gap-2">✓ Reservas en línea las 24 horas</li>
@@ -57,18 +59,38 @@ const AboutProject: React.FC = () => {
             <h2 className="text-xl font-bold">Ubicación y contacto</h2>
           </div>
           <div className="space-y-4 text-slate-300">
-            {business.address && (
-              <div className="flex items-start gap-3">
-                <MapPin size={18} className="text-amber-500 mt-0.5 shrink-0" />
-                <a
-                  href={buildMapsLink(business)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm leading-relaxed underline-offset-4 hover:underline"
-                >
-                  {business.address}
-                </a>
-              </div>
+            {locations.length > 0 ? (
+              locations.map(l => {
+                const place = l.address || l.mapsUrl ? l : business;
+                return (
+                  <div key={l.id} className="flex items-start gap-3">
+                    <MapPin size={18} className="text-amber-500 mt-0.5 shrink-0" />
+                    <a
+                      href={buildMapsLink(place)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm leading-relaxed underline-offset-4 hover:underline"
+                    >
+                      {locations.length > 1 && <span className="block font-semibold text-white">{l.name}</span>}
+                      {place.address}
+                    </a>
+                  </div>
+                );
+              })
+            ) : (
+              business.address && (
+                <div className="flex items-start gap-3">
+                  <MapPin size={18} className="text-amber-500 mt-0.5 shrink-0" />
+                  <a
+                    href={buildMapsLink(business)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm leading-relaxed underline-offset-4 hover:underline"
+                  >
+                    {business.address}
+                  </a>
+                </div>
+              )
             )}
             {business.displayPhone && (
               <div className="flex items-center gap-3">

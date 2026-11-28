@@ -1,4 +1,4 @@
-import { Booking, Business, BusinessSettings, MyBooking, Promotion, Service } from '../types';
+import { Booking, Business, BusinessLocation, BusinessSettings, MyBooking, Promotion, Service } from '../types';
 import { INITIAL_SERVICES, DEFAULT_SETTINGS, ADMIN_CREDENTIALS, DEMO_BUSINESS } from '../constants';
 import { lastTenDigits } from './format';
 import { isSupabaseEnabled, supabaseRequest, signIn, signOut, getAccessToken, checkIsAdmin } from './supabase';
@@ -17,7 +17,7 @@ import { isSupabaseEnabled, supabaseRequest, signIn, signOut, getAccessToken, ch
 // ---------------------------------------------------------------
 
 // Claves de almacenamiento en el navegador (una por negocio)
-const storageKey = (kind: 'services' | 'bookings' | 'settings', businessId: string): string =>
+const storageKey = (kind: 'services' | 'bookings' | 'settings' | 'locations', businessId: string): string =>
   `styleflow_${kind}_${businessId}`;
 
 // Función auxiliar para leer de LocalStorage
@@ -56,7 +56,24 @@ const mapService = (row: any): Service => ({
   title: row.title,
   price: row.price,
   durationMinutes: row.duration_minutes,
-  description: row.description || ''
+  description: row.description || '',
+  locationId: row.location_id ?? null
+});
+
+const mapLocation = (row: any): BusinessLocation => ({
+  id: row.id,
+  name: row.name,
+  address: row.address || '',
+  mapsUrl: row.maps_url || '',
+  capacity: row.capacity ?? null,
+  workStartTime: row.work_start ?? null,
+  workEndTime: row.work_end ?? null,
+  breakStartTime: row.break_start ?? null,
+  breakEndTime: row.break_end ?? null,
+  offDays: Array.isArray(row.off_days) ? row.off_days : null,
+  slotInterval: row.slot_interval ?? null,
+  sortOrder: row.sort_order ?? 0,
+  active: row.active !== false
 });
 
 const mapBooking = (row: any): Booking => ({
@@ -68,7 +85,9 @@ const mapBooking = (row: any): Booking => ({
   totalDuration: row.total_duration,
   date: dateStringToIso(row.booking_date),
   timeSlot: row.time_slot,
-  createdAt: row.created_at
+  createdAt: row.created_at,
+  locationId: row.location_id ?? null,
+  waiverAcceptedAt: row.waiver_accepted_at ?? null
 });
 
 const mapSettings = (row: any): BusinessSettings => ({
@@ -78,7 +97,10 @@ const mapSettings = (row: any): BusinessSettings => ({
   breakEndTime: row.break_end,
   offDays: row.off_days || [],
   slotInterval: row.slot_interval,
-  maxBookingsPerPhone: row.max_bookings_per_phone ?? DEFAULT_SETTINGS.maxBookingsPerPhone
+  maxBookingsPerPhone: row.max_bookings_per_phone ?? DEFAULT_SETTINGS.maxBookingsPerPhone,
+  capacity: row.capacity ?? DEFAULT_SETTINGS.capacity,
+  waiverEnabled: row.waiver_enabled === true,
+  waiverText: row.waiver_text || ''
 });
 
 const mapPromotion = (raw: any, index: number): Promotion => ({
@@ -199,7 +221,8 @@ export const saveService = async (businessId: string, service: Service): Promise
       title: service.title,
       price: service.price,
       duration_minutes: service.durationMinutes,
-      description: service.description || ''
+      description: service.description || '',
+      location_id: service.locationId || null
     };
 
     if (isUuid(service.id)) {
@@ -269,7 +292,7 @@ export const getBookings = async (businessId: string): Promise<Booking[]> => {
 // Horarios ocupados, SIN nombres ni celulares (para la pantalla de reservas de los clientes)
 export const getTakenSlots = async (businessId: string): Promise<Booking[]> => {
   if (isSupabaseEnabled()) {
-    const rows = await supabaseRequest<any[]>('/rest/v1/rpc/get_taken_slots', {
+    const rows = await supabaseRequest<any[]>('/rest/v1/rpc/get_booked_slots', {
       method: 'POST',
       body: { p_business: businessId, p_from: toDateString(new Date()) }
     });
@@ -282,13 +305,19 @@ export const getTakenSlots = async (businessId: string): Promise<Booking[]> => {
       totalDuration: row.total_duration,
       date: dateStringToIso(row.booking_date),
       timeSlot: row.time_slot,
-      createdAt: ''
+      createdAt: '',
+      locationId: row.location_id ?? null
     }));
   }
   return getBookings(businessId);
 };
 
-export const createBooking = async (businessId: string, booking: Omit<Booking, 'id' | 'createdAt'>): Promise<string> => {
+// waiverAccepted: el cliente marcó que acepta el deslinde (el servidor lo exige si el negocio lo pide)
+export const createBooking = async (
+  businessId: string,
+  booking: Omit<Booking, 'id' | 'createdAt'>,
+  waiverAccepted = false
+): Promise<string> => {
   if (isSupabaseEnabled()) {
     // El precio y la duración los calcula el servidor a partir de los servicios elegidos
     const id = await supabaseRequest<string>('/rest/v1/rpc/create_booking', {
@@ -299,7 +328,9 @@ export const createBooking = async (businessId: string, booking: Omit<Booking, '
         p_phone: booking.customerPhone,
         p_service_ids: booking.selectedServices.map(s => s.id),
         p_date: toDateString(new Date(booking.date)),
-        p_time_slot: booking.timeSlot
+        p_time_slot: booking.timeSlot,
+        p_location: booking.locationId || null,
+        p_waiver: waiverAccepted
       }
     });
     return id;
@@ -321,7 +352,8 @@ export const createBooking = async (businessId: string, booking: Omit<Booking, '
   const newBooking: Booking = {
     ...booking,
     id,
-    createdAt
+    createdAt,
+    waiverAcceptedAt: waiverAccepted ? createdAt : null
   };
 
   bookings.push(newBooking);
@@ -356,7 +388,8 @@ export const getMyBookings = async (businessId: string, phone: string): Promise<
       timeSlot: row.time_slot,
       services: Array.isArray(row.services) ? row.services : [],
       totalPrice: row.total_price,
-      totalDuration: row.total_duration
+      totalDuration: row.total_duration,
+      locationName: row.location_name || undefined
     }));
   }
 
@@ -421,9 +454,74 @@ export const saveBusinessSettings = async (businessId: string, settings: Busines
       break_end: settings.breakEndTime,
       off_days: settings.offDays,
       slot_interval: settings.slotInterval,
-      max_bookings_per_phone: settings.maxBookingsPerPhone
+      max_bookings_per_phone: settings.maxBookingsPerPhone,
+      capacity: settings.capacity,
+      waiver_enabled: settings.waiverEnabled,
+      waiver_text: settings.waiverText
     });
     return;
   }
   saveToStorage(storageKey('settings', businessId), settings);
+};
+
+// ---------------------------------------------------------------
+// Locales (sucursales)
+// ---------------------------------------------------------------
+
+// Todos los locales del negocio (también los ocultos), en el orden en que se muestran.
+// Si todavía no tiene locales regresa una lista vacía y el negocio funciona como un solo lugar.
+export const getLocations = async (businessId: string): Promise<BusinessLocation[]> => {
+  if (isSupabaseEnabled()) {
+    const rows = await supabaseRequest<any[]>(
+      `/rest/v1/locations?business_id=eq.${businessId}&select=*&order=sort_order.asc,created_at.asc`
+    );
+    return rows.map(mapLocation);
+  }
+  return getFromStorage<BusinessLocation[]>(storageKey('locations', businessId), []);
+};
+
+// Crea un local (sin id) o actualiza uno que ya existe. Los locales no se borran: se ocultan (active = false).
+export const saveLocation = async (
+  businessId: string,
+  location: Omit<BusinessLocation, 'id' | 'sortOrder'> & { id?: string; sortOrder?: number }
+): Promise<void> => {
+  if (isSupabaseEnabled()) {
+    const body: Record<string, unknown> = {
+      name: location.name,
+      address: location.address,
+      maps_url: location.mapsUrl,
+      capacity: location.capacity,
+      work_start: location.workStartTime,
+      work_end: location.workEndTime,
+      break_start: location.breakStartTime,
+      break_end: location.breakEndTime,
+      off_days: location.offDays,
+      slot_interval: location.slotInterval,
+      active: location.active
+    };
+
+    if (location.id && isUuid(location.id)) {
+      await mutate(`/rest/v1/locations?id=eq.${location.id}&business_id=eq.${businessId}`, 'PATCH', body);
+    } else {
+      const existing = await getLocations(businessId);
+      body.business_id = businessId;
+      body.sort_order = existing.length + 1;
+      await supabaseRequest('/rest/v1/locations', {
+        method: 'POST',
+        body,
+        asAdmin: true,
+        prefer: 'return=minimal'
+      });
+    }
+    return;
+  }
+
+  const list = await getLocations(businessId);
+  const index = list.findIndex(l => l.id === location.id);
+  if (index >= 0) {
+    list[index] = { ...list[index], ...location, id: list[index].id };
+  } else {
+    list.push({ ...location, id: Math.random().toString(36).substr(2, 9), sortOrder: list.length + 1 });
+  }
+  saveToStorage(storageKey('locations', businessId), list);
 };

@@ -1,18 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Booking, Service, BusinessSettings } from '../../types';
-import { getBookings, getServices, saveService, deleteService, deleteBooking, getBusinessSettings, saveBusinessSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin } from '../../services/dataService';
-import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw, MessageCircle } from 'lucide-react';
-import { DEFAULT_SETTINGS } from '../../constants';
+import { Booking, BusinessLocation, Service, BusinessSettings } from '../../types';
+import { getBookings, getServices, getLocations, saveService, deleteService, deleteBooking, getBusinessSettings, saveBusinessSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin } from '../../services/dataService';
+import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw, MessageCircle, MapPin } from 'lucide-react';
+import { DEFAULT_SETTINGS, DEFAULT_WAIVER_TEXT } from '../../constants';
 import { useBusiness } from '../../services/BusinessContext';
 import { formatMXN, formatTime, formatDateTimeShort, getDateParts, escapeHtml, buildCustomerWhatsAppLink } from '../../services/format';
 import AdminSummary from './AdminSummary';
+import AdminLocations, { WEEK_DAYS } from './AdminLocations';
 
 const AdminDashboard: React.FC = () => {
-  const { business, path, url: businessUrl } = useBusiness();
-  const [activeTab, setActiveTab] = useState<'summary' | 'bookings' | 'services' | 'settings'>('summary');
+  const { business, path, url: businessUrl, refreshLocations } = useBusiness();
+  const [activeTab, setActiveTab] = useState<'summary' | 'bookings' | 'services' | 'locations' | 'settings'>('summary');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  // Todos los locales del negocio (también los ocultos)
+  const [locations, setLocations] = useState<BusinessLocation[]>([]);
+  // Filtro de la lista de citas: '' = todos los locales
+  const [locationFilter, setLocationFilter] = useState('');
   const [settings, setSettings] = useState<BusinessSettings>(DEFAULT_SETTINGS);
   const [editingService, setEditingService] = useState<Partial<Service> | null>(null);
   const [showTodayOnly, setShowTodayOnly] = useState(false);
@@ -78,6 +83,8 @@ const AdminDashboard: React.FC = () => {
         const b = await getBookings(business.id);
         const s = await getServices(business.id);
         const config = await getBusinessSettings(business.id);
+        // Si no se pueden leer los locales, el panel sigue funcionando como un solo lugar
+        const locs = await getLocations(business.id).catch(() => [] as BusinessLocation[]);
 
         // Ordenar citas: día ascendente y luego hora ascendente
         const sortedBookings = b.sort((a, b) => {
@@ -94,6 +101,7 @@ const AdminDashboard: React.FC = () => {
 
         setBookings(sortedBookings);
         setServices(s);
+        setLocations(locs);
         // La actualización automática no toca la configuración: así no borra lo que se esté editando sin guardar
         if (!silent) setSettings(config);
     } catch (error) {
@@ -125,6 +133,7 @@ const AdminDashboard: React.FC = () => {
       return {
         'Cliente': b.customerName,
         'Celular': b.customerPhone,
+        ...(locations.length > 0 ? { 'Local': locationName(b) } : {}),
         'Servicios': b.selectedServices.map(s => s.title).join(', '),
         'Fecha': full,
         'Hora': formatTime(b.timeSlot),
@@ -193,10 +202,11 @@ const AdminDashboard: React.FC = () => {
                                   <thead>
                                       <tr>
                                           <th width="12%">Hora</th>
-                                          <th width="25%">Cliente</th>
-                                          <th width="20%">Celular</th>
-                                          <th width="28%">Servicios</th>
-                                          <th width="15%">Total (MXN)</th>
+                                          <th width="22%">Cliente</th>
+                                          <th width="18%">Celular</th>
+                                          ${locations.length > 0 ? '<th width="15%">Local</th>' : ''}
+                                          <th width="22%">Servicios</th>
+                                          <th width="12%">Total (MXN)</th>
                                       </tr>
                                   </thead>
                                   <tbody>
@@ -205,6 +215,7 @@ const AdminDashboard: React.FC = () => {
                                               <td><b>${escapeHtml(formatTime(b.timeSlot))}</b></td>
                                               <td>${escapeHtml(b.customerName)}</td>
                                               <td>${escapeHtml(b.customerPhone)}</td>
+                                              ${locations.length > 0 ? `<td>${escapeHtml(locationName(b))}</td>` : ''}
                                               <td>${escapeHtml(b.selectedServices.map(s => s.title).join(', '))}</td>
                                               <td>${escapeHtml(formatMXN(b.totalPrice))}</td>
                                           </tr>
@@ -233,7 +244,8 @@ const AdminDashboard: React.FC = () => {
       title: editingService.title,
       price: Number(editingService.price),
       durationMinutes: Number(editingService.durationMinutes) || 30,
-      description: editingService.description || ''
+      description: editingService.description || '',
+      locationId: editingService.locationId || null
     };
 
     try {
@@ -315,7 +327,13 @@ const AdminDashboard: React.FC = () => {
       navigate(path('/admin/login'));
   }
 
+  // Nombre del local de una cita ('' si el negocio no usa locales o la cita es anterior a ellos)
+  function locationName(b: Booking): string {
+      return locations.find(l => l.id === b.locationId)?.name || '';
+  }
+
   const getDisplayedBookings = () => {
+      const inLocation = (b: Booking) => !locationFilter || b.locationId === locationFilter;
       if (showTodayOnly) {
           const today = new Date();
           const todayVal = today.getFullYear() * 10000 + today.getMonth() * 100 + today.getDate();
@@ -324,11 +342,11 @@ const AdminDashboard: React.FC = () => {
             .filter(b => {
                 const bd = new Date(b.date);
                 const bdVal = bd.getFullYear() * 10000 + bd.getMonth() * 100 + bd.getDate();
-                return bdVal === todayVal;
+                return bdVal === todayVal && inLocation(b);
             })
             .sort((a, b) => a.timeSlot.localeCompare(b.timeSlot));
       }
-      return bookings;
+      return bookings.filter(inLocation);
   };
 
   // Agrupar las citas por fecha para la vista principal
@@ -357,15 +375,7 @@ const AdminDashboard: React.FC = () => {
   });
 
   // id = número de día en JavaScript (0 = domingo ... 6 = sábado)
-  const weekDays = [
-      { id: 1, label: 'Lunes' },
-      { id: 2, label: 'Martes' },
-      { id: 3, label: 'Miércoles' },
-      { id: 4, label: 'Jueves' },
-      { id: 5, label: 'Viernes' },
-      { id: 6, label: 'Sábado' },
-      { id: 0, label: 'Domingo' },
-  ];
+  const weekDays = WEEK_DAYS;
 
   return (
     <div className="space-y-6 pb-20 relative">
@@ -553,6 +563,13 @@ const AdminDashboard: React.FC = () => {
           {activeTab === 'services' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
         </button>
         <button
+          onClick={() => setActiveTab('locations')}
+          className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'locations' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          Locales
+          {activeTab === 'locations' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
+        </button>
+        <button
           onClick={() => setActiveTab('settings')}
           className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'settings' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
         >
@@ -603,6 +620,20 @@ const AdminDashboard: React.FC = () => {
                       <div className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`}></div>
                       {autoRefresh ? 'Actualización automática: sí' : 'Actualización automática: no'}
                   </button>
+
+                  {locations.length > 0 && (
+                      <select
+                        value={locationFilter}
+                        onChange={e => setLocationFilter(e.target.value)}
+                        aria-label="Filtrar citas por local"
+                        className="bg-slate-800 text-slate-300 px-3 py-2 rounded-lg border border-slate-700 outline-none focus:border-amber-500"
+                      >
+                          <option value="">Todos los locales</option>
+                          {locations.map(l => (
+                              <option key={l.id} value={l.id}>{l.name}</option>
+                          ))}
+                      </select>
+                  )}
 
                   {showTodayOnly && (
                       <span className="text-sm text-amber-500 font-medium animate-pulse ml-2">
@@ -692,6 +723,11 @@ const AdminDashboard: React.FC = () => {
                                     <td className="p-4">
                                         <div className="font-bold text-white">{booking.customerName}</div>
                                         <div className="text-slate-500 text-xs font-mono mt-1">{booking.customerPhone}</div>
+                                        {locationName(booking) && (
+                                            <div className="text-amber-500 text-xs mt-1 flex items-center gap-1">
+                                                <MapPin size={12} aria-hidden="true" /> {locationName(booking)}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="p-4 text-slate-300">
                                         <div className="flex flex-wrap gap-1">
@@ -771,6 +807,22 @@ const AdminDashboard: React.FC = () => {
                           onChange={e => setEditingService({...editingService, description: e.target.value})}
                           className="p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-amber-500 outline-none"
                        />
+                       {locations.length > 0 && (
+                          <div className="md:col-span-2">
+                              <label htmlFor="service-location" className="block text-slate-400 text-sm mb-2">Disponible en</label>
+                              <select
+                                id="service-location"
+                                value={editingService.locationId || ''}
+                                onChange={e => setEditingService({...editingService, locationId: e.target.value || null})}
+                                className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-white focus:border-amber-500 outline-none"
+                              >
+                                  <option value="">Todos los locales</option>
+                                  {locations.map(l => (
+                                      <option key={l.id} value={l.id}>{l.name}{l.active ? '' : ' (oculto)'}</option>
+                                  ))}
+                              </select>
+                          </div>
+                       )}
                    </div>
                    <div className="flex justify-end gap-3">
                        <button onClick={() => setEditingService(null)} className="px-4 py-2 text-slate-400 hover:bg-slate-800 rounded-lg">Cancelar</button>
@@ -786,6 +838,11 @@ const AdminDashboard: React.FC = () => {
                            <h4 className="font-bold text-white text-lg">{service.title}</h4>
                            <p className="text-sm text-slate-400 mt-2">{formatMXN(service.price)} MXN</p>
                            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><Clock size={12}/> {service.durationMinutes} min</p>
+                           {locations.length > 0 && (
+                               <p className="text-xs text-amber-500 mt-1 flex items-center gap-1">
+                                   <MapPin size={12} aria-hidden="true" /> {locations.find(l => l.id === service.locationId)?.name || 'Todos los locales'}
+                               </p>
+                           )}
                        </div>
                        <div className="flex gap-2">
                            <button onClick={() => setEditingService(service)} className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-full transition-colors">
@@ -799,6 +856,20 @@ const AdminDashboard: React.FC = () => {
                ))}
            </div>
         </div>
+      )}
+
+      {activeTab === 'locations' && (
+        <AdminLocations
+          businessId={business.id}
+          locations={locations}
+          settings={settings}
+          onChanged={async () => {
+            await loadData(true);
+            await refreshLocations();
+          }}
+          onSuccess={message => setNotification({ type: 'success', message })}
+          onError={handleActionError}
+        />
       )}
 
       {activeTab === 'settings' && (
@@ -920,6 +991,69 @@ const AdminDashboard: React.FC = () => {
                           <option key={n} value={n}>{n}</option>
                       ))}
                   </select>
+              </div>
+
+              {/* Lugares por horario */}
+              <div className="mt-8">
+                  <h3 className="font-bold text-white text-lg mb-2">Lugares por horario</h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                      Cuántas personas pueden reservar al mismo tiempo. Déjalo en 1 si atiendes una persona a la vez; ponlo en 6 si tu clase tiene 6 lugares.
+                      {locations.length > 0 && ' Cada local puede tener su propio número.'}
+                  </p>
+                  <label htmlFor="cupo-por-horario" className="block text-slate-400 text-sm mb-2">Lugares por horario</label>
+                  <select
+                    id="cupo-por-horario"
+                    value={settings.capacity}
+                    onChange={(e) => setSettings({...settings, capacity: Number(e.target.value)})}
+                    className="w-full md:w-48 p-3 bg-slate-950 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500"
+                  >
+                      {Array.from({length: 50}, (_, i) => i + 1).map(n => (
+                          <option key={n} value={n}>{n}</option>
+                      ))}
+                  </select>
+              </div>
+
+              {/* Deslinde de responsabilidad */}
+              <div className="mt-8">
+                  <h3 className="font-bold text-white text-lg mb-2">Deslinde de responsabilidad</h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                      Si lo activas, tus clientes tienen que aceptarlo antes de reservar. Queda registrada la fecha en que lo aceptaron.
+                  </p>
+                  <label className="flex items-center gap-3 cursor-pointer text-slate-200 mb-4">
+                      <input
+                        type="checkbox"
+                        checked={settings.waiverEnabled}
+                        onChange={(e) => setSettings({...settings, waiverEnabled: e.target.checked})}
+                        className="h-5 w-5 accent-amber-500"
+                      />
+                      Pedir que acepten el deslinde al reservar
+                  </label>
+                  {settings.waiverEnabled && (
+                      <div className="space-y-3">
+                          <label htmlFor="texto-deslinde" className="block text-slate-400 text-sm">Texto del deslinde</label>
+                          <textarea
+                            id="texto-deslinde"
+                            rows={7}
+                            maxLength={4000}
+                            value={settings.waiverText}
+                            placeholder={DEFAULT_WAIVER_TEXT}
+                            onChange={(e) => setSettings({...settings, waiverText: e.target.value})}
+                            className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500 text-sm leading-relaxed"
+                          />
+                          <p className="text-xs text-slate-500">
+                              Si lo dejas en blanco, se muestra un texto general. Conviene que lo revise la persona que lleva tu negocio o un abogado.
+                          </p>
+                          {!settings.waiverText && (
+                              <button
+                                type="button"
+                                onClick={() => setSettings({...settings, waiverText: DEFAULT_WAIVER_TEXT})}
+                                className="text-sm text-amber-500 hover:underline"
+                              >
+                                  Usar el texto general como punto de partida
+                              </button>
+                          )}
+                      </div>
+                  )}
               </div>
 
               {/* Botón de guardar */}

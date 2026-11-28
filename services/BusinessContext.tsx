@@ -1,10 +1,14 @@
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
-import { Business } from '../types';
+import { Business, BusinessLocation } from '../types';
 import { USE_HASH_ROUTER } from '../constants';
 
 // El negocio que se está viendo (el que va en la dirección: .../<slug>) y una ayuda para armar sus rutas.
 interface BusinessContextType {
   business: Business;
+  // Locales activos del negocio, en orden. Vacío = el negocio es un solo lugar (sin selector de local).
+  locations: BusinessLocation[];
+  // Vuelve a leer los locales (el panel de administración lo usa después de guardar cambios)
+  refreshLocations: () => Promise<void>;
   // Ruta de una pantalla dentro de este negocio: path('/booking') -> "/<slug>/booking"; path() -> "/<slug>"
   path: (to?: string) => string;
   // Dirección completa del negocio, para mandarla en mensajes (por ejemplo, al reagendar)
@@ -13,7 +17,12 @@ interface BusinessContextType {
 
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined);
 
-export const BusinessProvider: React.FC<{ business: Business; children: React.ReactNode }> = ({ business, children }) => {
+export const BusinessProvider: React.FC<{
+  business: Business;
+  locations?: BusinessLocation[];
+  refreshLocations?: () => Promise<void>;
+  children: React.ReactNode;
+}> = ({ business, locations = [], refreshLocations = async () => {}, children }) => {
   const slug = business.slug;
 
   const path = useCallback(
@@ -31,7 +40,10 @@ export const BusinessProvider: React.FC<{ business: Business; children: React.Re
       : `${window.location.origin}${base}/${slug}`;
   }, [slug]);
 
-  const value = useMemo(() => ({ business, path, url }), [business, path, url]);
+  const value = useMemo(
+    () => ({ business, locations, refreshLocations, path, url }),
+    [business, locations, refreshLocations, path, url]
+  );
 
   return <BusinessContext.Provider value={value}>{children}</BusinessContext.Provider>;
 };

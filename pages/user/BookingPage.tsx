@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Service, Booking, BusinessSettings } from '../../types';
+import { Service, Booking, BusinessLocation, BusinessSettings } from '../../types';
 import { getServices, createBooking, getTakenSlots, getBusinessSettings } from '../../services/dataService';
 import { useBusiness } from '../../services/BusinessContext';
 import { getCategory } from '../../services/categories';
-import { DEFAULT_SETTINGS } from '../../constants';
+import { DEFAULT_SETTINGS, DEFAULT_WAIVER_TEXT } from '../../constants';
 import { formatMXN, formatDateLong, formatDateShort, formatTime, isValidMexicanPhone } from '../../services/format';
-import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, Loader2 } from 'lucide-react';
+import { effectiveSchedule, generateTimeSlots, freeSpots, toMinutes } from '../../services/slots';
+import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, Loader2, MapPin } from 'lucide-react';
 
 const BookingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { business, path } = useBusiness();
-  const [step, setStep] = useState(1);
+  const { business, path, locations } = useBusiness();
+  // Con varios locales el primer paso es elegir uno; con uno solo se usa ese sin preguntar
+  const needsLocation = locations.length > 1;
+  const stepShift = needsLocation ? 1 : 0;
+  const [step, setStep] = useState(needsLocation ? 0 : 1);
+  const [selectedLocation, setSelectedLocation] = useState<BusinessLocation | null>(locations.length === 1 ? locations[0] : null);
+  const [waiverAccepted, setWaiverAccepted] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -22,7 +28,7 @@ const BookingPage: React.FC = () => {
   const [formError, setFormError] = useState('');
 
   // Horarios disponibles y configuración
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [availableSlots, setAvailableSlots] = useState<{ time: string; free: number }[]>([]);
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [settings, setSettings] = useState<BusinessSettings>(DEFAULT_SETTINGS);
   const [loadingData, setLoadingData] = useState(true);
@@ -54,54 +60,13 @@ const BookingPage: React.FC = () => {
     initData();
   }, []);
 
-  // Genera los horarios según la configuración del negocio
-  const generateTimeSlots = (settings: BusinessSettings) => {
-      const slots: string[] = [];
-      const [startH, startM] = settings.workStartTime.split(':').map(Number);
-      const [endH, endM] = settings.workEndTime.split(':').map(Number);
+  // Horario, descanso y lugares por horario del local elegido (o del negocio, si no tiene locales)
+  const schedule = effectiveSchedule(selectedLocation, settings);
 
-      let currentH = startH;
-      let currentM = startM;
+  // Servicios que se ofrecen en el local elegido (los que no tienen local se ofrecen en todos)
+  const visibleServices = services.filter(s => !s.locationId || s.locationId === selectedLocation?.id);
 
-      const endTotalMinutes = endH * 60 + endM;
-
-      while (true) {
-          const currentTotalMinutes = currentH * 60 + currentM;
-
-          // Detenerse al llegar a la hora de cierre
-          if (currentTotalMinutes >= endTotalMinutes) break;
-
-          const timeString = `${currentH.toString().padStart(2, '0')}:${currentM.toString().padStart(2, '0')}`;
-
-          // Revisar la hora de descanso
-          let inBreak = false;
-          if (settings.breakStartTime && settings.breakEndTime) {
-               const [breakStartH, breakStartM] = settings.breakStartTime.split(':').map(Number);
-               const [breakEndH, breakEndM] = settings.breakEndTime.split(':').map(Number);
-
-               const breakStartTotal = breakStartH * 60 + breakStartM;
-               const breakEndTotal = breakEndH * 60 + breakEndM;
-
-               if (currentTotalMinutes >= breakStartTotal && currentTotalMinutes < breakEndTotal) {
-                   inBreak = true;
-               }
-          }
-
-          if (!inBreak) {
-              slots.push(timeString);
-          }
-
-          // Avanzar al siguiente horario
-          currentM += settings.slotInterval;
-          if (currentM >= 60) {
-              currentH += Math.floor(currentM / 60);
-              currentM = currentM % 60;
-          }
-      }
-      return slots;
-  };
-
-  // Actualiza los horarios disponibles cuando cambia la fecha o las citas
+  // Actualiza los horarios disponibles cuando cambia la fecha, el local o las citas
   useEffect(() => {
     if (loadingData) return;
 
@@ -109,7 +74,7 @@ const BookingPage: React.FC = () => {
     const dayOfWeek = selectedDate.getDay(); // 0 (domingo) a 6 (sábado)
 
     // ¿Es día de descanso?
-    if (settings.offDays.includes(dayOfWeek)) {
+    if (schedule.offDays.includes(dayOfWeek)) {
         setIsDayOff(true);
         setAvailableSlots([]);
         setSelectedTime('');
@@ -118,41 +83,26 @@ const BookingPage: React.FC = () => {
         setIsDayOff(false);
     }
 
-    // Horarios base
-    const slots = generateTimeSlots(settings);
+    // Citas del día seleccionado en este local
+    const dayBookings = allBookings.filter(b =>
+        new Date(b.date).toDateString() === dateString && (b.locationId ?? null) === (selectedLocation?.id ?? null)
+    );
 
-    // "HH:MM" a minutos desde la medianoche
-    const toMinutes = (time: string) => {
-        const [h, m] = time.split(':').map(Number);
-        return h * 60 + m;
-    };
-
-    // Citas del día seleccionado
-    const dayBookings = allBookings.filter(b => {
-        const bookingDate = new Date(b.date);
-        return bookingDate.toDateString() === dateString;
-    });
-
-    // Un horario está ocupado si se cruza con alguna cita
-    // (inicio de la cita -> inicio + duración total). Así se evitan citas dobles
-    // aunque un servicio dure más de un horario.
     // La duración de lo que el cliente eligió también cuenta: un servicio de 2 horas
     // no debe caber en un hueco de 30 minutos.
     const neededMinutes = Math.max(
         selectedServices.reduce((sum, s) => sum + s.durationMinutes, 0),
-        settings.slotInterval
+        schedule.slotInterval
     );
-    const isSlotTaken = (slot: string) => {
-        const slotStart = toMinutes(slot);
-        const slotEnd = slotStart + neededMinutes;
-        return dayBookings.some(b => {
-            const bookingStart = toMinutes(b.timeSlot);
-            const bookingEnd = bookingStart + (b.totalDuration || settings.slotInterval);
-            return slotStart < bookingEnd && slotEnd > bookingStart;
-        });
-    };
 
-    let free = slots.filter(slot => !isSlotTaken(slot));
+    // Un horario sigue disponible mientras queden lugares: en cada momento de la cita
+    // puede haber hasta "capacity" citas a la vez (con capacity 1 es una cita a la vez).
+    let free = generateTimeSlots(schedule)
+        .map(time => ({
+            time,
+            free: freeSpots(toMinutes(time), neededMinutes, schedule.capacity, dayBookings, schedule.slotInterval)
+        }))
+        .filter(slot => slot.free > 0);
 
     // Si la fecha es hoy, quitar los horarios que ya pasaron
     const now = new Date();
@@ -161,7 +111,7 @@ const BookingPage: React.FC = () => {
         const currentMinute = now.getMinutes();
 
         free = free.filter(slot => {
-            const [h, m] = slot.split(':').map(Number);
+            const [h, m] = slot.time.split(':').map(Number);
             if (h < currentHour) return false;
             if (h === currentHour && m <= currentMinute) return false;
             return true;
@@ -171,10 +121,28 @@ const BookingPage: React.FC = () => {
     setAvailableSlots(free);
 
     // Limpiar la hora elegida si ya no está disponible
-    if (selectedTime && (!free.includes(selectedTime))) {
+    if (selectedTime && !free.some(slot => slot.time === selectedTime)) {
         setSelectedTime('');
     }
-  }, [selectedDate, allBookings, selectedTime, settings, loadingData, selectedServices]);
+  }, [selectedDate, allBookings, selectedTime, settings, loadingData, selectedServices, selectedLocation]);
+
+  // Elegir (o cambiar) el local: los servicios que no se ofrecen ahí se quitan y la hora se vuelve a elegir
+  const chooseLocation = (location: BusinessLocation) => {
+    setSelectedLocation(location);
+    setSelectedServices(prev => prev.filter(s => !s.locationId || s.locationId === location.id));
+    setSelectedTime('');
+    setFormError('');
+    setStep(1);
+  };
+
+  // Local elegido, para recordarlo en los pasos siguientes (solo cuando hay varios)
+  const locationBadge = needsLocation && selectedLocation ? (
+    <p className="flex items-center gap-1.5 text-sm text-slate-400">
+      <MapPin size={14} className="text-amber-500" aria-hidden="true" /> {selectedLocation.name}
+    </p>
+  ) : null;
+
+  const waiverText = settings.waiverText.trim() || DEFAULT_WAIVER_TEXT;
 
 
   const toggleService = (service: Service) => {
@@ -197,6 +165,10 @@ const BookingPage: React.FC = () => {
         setFormError('Escribe un número de celular válido de 10 dígitos.');
         return;
       }
+      if (settings.waiverEnabled && !waiverAccepted) {
+        setFormError('Para reservar necesitas aceptar el deslinde.');
+        return;
+      }
       setFormError('');
       setLoading(true);
       try {
@@ -207,8 +179,9 @@ const BookingPage: React.FC = () => {
           totalPrice,
           totalDuration,
           date: selectedDate.toISOString(),
-          timeSlot: selectedTime
-        });
+          timeSlot: selectedTime,
+          locationId: selectedLocation?.id ?? null
+        }, waiverAccepted);
 
         // Ir a la página de confirmación
         navigate(path('/success'), {
@@ -217,7 +190,10 @@ const BookingPage: React.FC = () => {
                 formattedDate: formatDateLong(selectedDate),
                 timeSlot: selectedTime,
                 servicesText: selectedServices.map(s => s.title).join(', '),
-                totalPrice
+                totalPrice,
+                locationName: selectedLocation?.name,
+                locationAddress: selectedLocation?.address,
+                locationMapsUrl: selectedLocation?.mapsUrl
             }
         });
 
@@ -233,6 +209,20 @@ const BookingPage: React.FC = () => {
           setSelectedTime('');
           setStep(2);
           setFormError('Ese horario ya se ocupó. Elige otro, por favor.');
+        } else if (code === 'waiver_required') {
+          setFormError('Para reservar necesitas aceptar el deslinde.');
+        } else if (code === 'location_required' || code === 'invalid_location') {
+          setStep(needsLocation ? 0 : 1);
+          setFormError('Elige un local para continuar.');
+        } else if (code === 'invalid_services') {
+          try {
+            setServices(await getServices(business.id));
+          } catch (refreshError) {
+            console.error('No se pudieron actualizar los servicios', refreshError);
+          }
+          setSelectedServices([]);
+          setStep(1);
+          setFormError('Alguno de los servicios ya no está disponible. Elígelos de nuevo, por favor.');
         } else if (code === 'invalid_phone') {
           setFormError('Escribe un número de celular válido de 10 dígitos.');
         } else if (code === 'invalid_name') {
@@ -274,17 +264,71 @@ const BookingPage: React.FC = () => {
       );
   }
 
+  // --- Paso 0 (solo si hay varios locales): elegir local ---
+  if (step === 0) {
+    return (
+      <div className="space-y-6 animate-in slide-in-from-right-4 pb-24">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white">Elige tu local</h2>
+          <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso 1 de {3 + stepShift}</span>
+        </div>
+
+        {formError && (
+          <p className="text-red-500 text-sm text-center bg-red-500/10 py-3 rounded-xl border border-red-500/20">{formError}</p>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {locations.map(location => {
+            const isSelected = selectedLocation?.id === location.id;
+            return (
+              <button
+                key={location.id}
+                onClick={() => chooseLocation(location)}
+                className={`text-left p-5 rounded-2xl border-2 transition-all ${
+                  isSelected
+                    ? 'border-amber-500 bg-amber-500/10 pop-accent'
+                    : 'border-slate-800 hover:border-amber-500/60 bg-slate-900'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <MapPin className="text-amber-500 mt-1 shrink-0" size={22} aria-hidden="true" />
+                  <div>
+                    <h3 className="font-display uppercase tracking-wide text-2xl text-white">{location.name}</h3>
+                    {location.address && <p className="text-sm text-slate-400 mt-2 leading-relaxed">{location.address}</p>}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   // --- Paso 1: elegir servicios ---
   if (step === 1) {
     return (
       <div className="space-y-6 animate-in slide-in-from-right-4 pb-40 md:pb-0">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">Elige tus servicios</h2>
-          <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso 1 de 3</span>
+        {needsLocation && (
+          <button onClick={() => setStep(0)} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
+            <ChevronLeft size={16} /> Cambiar de local
+          </button>
+        )}
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-white">Elige tus servicios</h2>
+            <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso {1 + stepShift} de {3 + stepShift}</span>
+          </div>
+          {locationBadge}
         </div>
 
+        {formError && (
+          <p className="text-red-500 text-sm text-center bg-red-500/10 py-3 rounded-xl border border-red-500/20">{formError}</p>
+        )}
+
         <div className="grid gap-4 md:grid-cols-2">
-          {services.map(service => {
+          {visibleServices.map(service => {
             const isSelected = selectedServices.find(s => s.id === service.id);
             return (
               <div
@@ -348,9 +392,12 @@ const BookingPage: React.FC = () => {
                 <ChevronLeft size={16} /> Atrás
             </button>
 
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white">Elige fecha y hora</h2>
-                <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso 2 de 3</span>
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-white">Elige fecha y hora</h2>
+                    <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso {2 + stepShift} de {3 + stepShift}</span>
+                </div>
+                {locationBadge}
             </div>
 
             <div className="space-y-4">
@@ -405,7 +452,7 @@ const BookingPage: React.FC = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                        {availableSlots.map(time => (
+                        {availableSlots.map(({ time, free }) => (
                             <button
                                 key={time}
                                 onClick={() => { setSelectedTime(time); setFormError(''); }}
@@ -416,6 +463,9 @@ const BookingPage: React.FC = () => {
                                 }`}
                             >
                                 {formatTime(time)}
+                                {schedule.capacity > 1 && (
+                                    <span className="block text-[11px] font-normal opacity-70">{free === 1 ? '1 lugar' : `${free} lugares`}</span>
+                                )}
                             </button>
                         ))}
                     </div>
@@ -448,7 +498,7 @@ const BookingPage: React.FC = () => {
 
         <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-white">Tus datos</h2>
-            <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso 3 de 3</span>
+            <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso {3 + stepShift} de {3 + stepShift}</span>
         </div>
 
         <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
@@ -482,8 +532,32 @@ const BookingPage: React.FC = () => {
             )}
         </div>
 
+        {settings.waiverEnabled && (
+            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                <h3 className="font-bold text-white">Deslinde de responsabilidad</h3>
+                <div className="max-h-44 overflow-y-auto rounded-xl bg-slate-950 border border-slate-800 p-4 text-sm text-slate-300 leading-relaxed whitespace-pre-line">
+                    {waiverText}
+                </div>
+                <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={waiverAccepted}
+                        onChange={(e) => { setWaiverAccepted(e.target.checked); setFormError(''); }}
+                        className="mt-0.5 h-5 w-5 shrink-0 accent-amber-500"
+                    />
+                    <span className="text-sm text-slate-200">He leído y acepto el deslinde.</span>
+                </label>
+            </div>
+        )}
+
         <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
              <h3 className="font-bold text-white mb-2">Resumen de tu cita</h3>
+             {selectedLocation && (
+                 <div className="flex justify-between text-sm gap-4">
+                     <span className="text-slate-400">Local:</span>
+                     <span className="font-medium text-slate-200 text-right">{selectedLocation.name}</span>
+                 </div>
+             )}
              <div className="flex justify-between text-sm gap-4">
                  <span className="text-slate-400">Servicios:</span>
                  <span className="font-medium text-slate-200 text-right">{selectedServices.map(s => s.title).join(', ')}</span>

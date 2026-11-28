@@ -119,6 +119,44 @@ create table if not exists public.bookings (
   created_at timestamptz not null default now()
 );
 
+-- Cupo y deslinde (se cambian desde el panel, en Configuración)
+--   capacity: lugares por horario (barbería con 3 sillas = 3; estudio con 6 tubos = 6)
+--   waiver_enabled / waiver_text: deslinde que el cliente acepta al reservar (si el texto está en blanco se usa uno general)
+alter table public.settings add column if not exists capacity integer not null default 1
+  check (capacity between 1 and 50);
+alter table public.settings add column if not exists waiver_enabled boolean not null default false;
+alter table public.settings add column if not exists waiver_text text not null default ''
+  check (char_length(waiver_text) <= 4000);
+
+-- Locales (sucursales) de un negocio. Todo lo que quede en blanco (null) usa lo de Configuración del negocio.
+-- Mientras un negocio no tenga locales, funciona como siempre (un solo lugar).
+create table if not exists public.locations (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 80),
+  address text not null default '' check (char_length(address) <= 200),
+  maps_url text not null default '' check (maps_url = '' or maps_url ~* '^https?://[^ ]+$'),
+  capacity integer check (capacity is null or capacity between 1 and 50),
+  work_start text check (work_start is null or work_start ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  work_end text check (work_end is null or work_end ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  break_start text check (break_start is null or break_start ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  break_end text check (break_end is null or break_end ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  off_days integer[],
+  slot_interval integer check (slot_interval is null or slot_interval between 5 and 240),
+  sort_order integer not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create index if not exists locations_business_idx on public.locations (business_id);
+
+-- Un servicio sin local es de todos; con local, solo de ese
+alter table public.services add column if not exists location_id uuid references public.locations(id) on delete set null;
+
+-- La cita guarda en qué local es y, si el negocio pide deslinde, cuándo lo aceptó
+alter table public.bookings add column if not exists location_id uuid references public.locations(id) on delete set null;
+alter table public.bookings add column if not exists waiver_accepted_at timestamptz;
+create index if not exists bookings_business_date_idx on public.bookings (business_id, booking_date);
+
 -- Correos con permiso de administrador (cada uno, en su negocio)
 create table if not exists public.admins (
   business_id uuid references public.businesses(id) on delete cascade,
@@ -271,6 +309,7 @@ alter table public.settings enable row level security;
 alter table public.bookings enable row level security;
 alter table public.admins enable row level security;         -- sin políticas: nadie la lee directo
 alter table public.notify_chats enable row level security;   -- sin políticas: nadie la lee directo
+alter table public.locations enable row level security;
 
 -- Negocios: los ven todos (solo los activos). Se crean y cambian desde el editor SQL.
 drop policy if exists "businesses_select" on public.businesses;
@@ -282,14 +321,24 @@ drop policy if exists "services_select" on public.services;
 create policy "services_select" on public.services
   for select to anon, authenticated using (true);
 
+-- (el local de un servicio tiene que ser de ese mismo negocio)
 drop policy if exists "services_insert" on public.services;
 create policy "services_insert" on public.services
-  for insert to authenticated with check (public.is_business_admin(business_id));
+  for insert to authenticated with check (
+    public.is_business_admin(business_id)
+    and (location_id is null or exists (
+      select 1 from public.locations l where l.id = services.location_id and l.business_id = services.business_id))
+  );
 
 drop policy if exists "services_update" on public.services;
 create policy "services_update" on public.services
   for update to authenticated
-  using (public.is_business_admin(business_id)) with check (public.is_business_admin(business_id));
+  using (public.is_business_admin(business_id))
+  with check (
+    public.is_business_admin(business_id)
+    and (location_id is null or exists (
+      select 1 from public.locations l where l.id = services.location_id and l.business_id = services.business_id))
+  );
 
 drop policy if exists "services_delete" on public.services;
 create policy "services_delete" on public.services
@@ -302,6 +351,21 @@ create policy "settings_select" on public.settings
 
 drop policy if exists "settings_update" on public.settings;
 create policy "settings_update" on public.settings
+  for update to authenticated
+  using (public.is_business_admin(business_id)) with check (public.is_business_admin(business_id));
+
+-- Locales: los ve cualquiera (dirección y mapa son públicos); solo el admin de ese negocio los crea y cambia.
+-- No se borran: se ocultan (active = false) para no perder el historial de sus citas.
+drop policy if exists "locations_select" on public.locations;
+create policy "locations_select" on public.locations
+  for select to anon, authenticated using (true);
+
+drop policy if exists "locations_insert" on public.locations;
+create policy "locations_insert" on public.locations
+  for insert to authenticated with check (public.is_business_admin(business_id));
+
+drop policy if exists "locations_update" on public.locations;
+create policy "locations_update" on public.locations
   for update to authenticated
   using (public.is_business_admin(business_id)) with check (public.is_business_admin(business_id));
 
@@ -318,13 +382,18 @@ create policy "bookings_delete" on public.bookings
 -- (las reglas de arriba deciden además qué filas se ven). Las columnas business_id
 -- e id nunca se pueden modificar desde la app.
 revoke all on public.businesses, public.services, public.settings, public.bookings,
-  public.admins, public.notify_chats from anon, authenticated;
+  public.admins, public.notify_chats, public.locations from anon, authenticated;
 grant usage on schema public to anon, authenticated;
-grant select on public.businesses, public.services, public.settings to anon, authenticated;
+grant select on public.businesses, public.services, public.settings, public.locations to anon, authenticated;
 grant insert, delete on public.services to authenticated;
-grant update (title, price, duration_minutes, description, sort_order) on public.services to authenticated;
-grant update (work_start, work_end, break_start, break_end, off_days, slot_interval, max_bookings_per_phone)
+grant update (title, price, duration_minutes, description, sort_order, location_id) on public.services to authenticated;
+grant update (work_start, work_end, break_start, break_end, off_days, slot_interval, max_bookings_per_phone,
+  capacity, waiver_enabled, waiver_text)
   on public.settings to authenticated;
+grant insert on public.locations to authenticated;
+grant update (name, address, maps_url, capacity, work_start, work_end, break_start, break_end, off_days,
+  slot_interval, sort_order, active)
+  on public.locations to authenticated;
 grant select, delete on public.bookings to authenticated;
 
 -- 5) HORARIOS OCUPADOS (sin datos personales) ---------------------------
@@ -346,15 +415,41 @@ $$;
 
 grant execute on function public.get_taken_slots(uuid, date) to anon, authenticated;
 
+-- Igual que la anterior, pero dice en qué local es cada cita (la pantalla de reservas la usa para contar el cupo)
+create or replace function public.get_booked_slots(p_business uuid, p_from date default current_date)
+returns table (booking_date date, time_slot text, total_duration integer, location_id uuid)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select b.booking_date, b.time_slot, b.total_duration, b.location_id
+  from public.bookings b
+  where b.business_id = p_business
+    and b.booking_date >= p_from
+    and b.booking_date <= p_from + 120
+  order by b.booking_date, b.time_slot;
+$$;
+
+grant execute on function public.get_booked_slots(uuid, date) to anon, authenticated;
+
 -- 6) CREAR UNA CITA (validada en el servidor, sin citas dobles) -----------
 
+-- Cambió la lista de datos: se quita la versión anterior (la nueva acepta las mismas llamadas de antes)
+drop function if exists public.create_booking(uuid, text, text, uuid[], date, text);
+
+-- p_location: el local elegido (si el negocio tiene varios es obligatorio; si tiene uno, se usa ese).
+-- p_waiver: true si el cliente aceptó el deslinde (obligatorio solo si el negocio lo pide).
+-- Cupo: en cada instante puede haber hasta "capacity" citas en el mismo local.
 create or replace function public.create_booking(
   p_business uuid,
   p_name text,
   p_phone text,
   p_service_ids uuid[],
   p_date date,
-  p_time_slot text
+  p_time_slot text,
+  p_location uuid default null,
+  p_waiver boolean default false
 )
 returns uuid
 language plpgsql
@@ -372,7 +467,15 @@ declare
   v_found integer;
   v_requested integer;
   v_set public.settings%rowtype;
-  v_has_settings boolean;
+  v_loc public.locations%rowtype;
+  v_location uuid;
+  v_nloc integer;
+  v_work_start text;
+  v_work_end text;
+  v_break_start text;
+  v_break_end text;
+  v_off integer[];
+  v_capacity integer;
   v_active integer;
 begin
   if not exists (select 1 from public.businesses where id = p_business and active) then
@@ -397,7 +500,31 @@ begin
     raise exception 'past_date';
   end if;
 
-  -- Servicios: deben ser de ESTE negocio. El precio y la duración se calculan aquí, no los manda el cliente
+  select * into v_set from public.settings where business_id = p_business;
+
+  -- Deslinde: si el negocio lo pide, el cliente tiene que haberlo aceptado
+  if coalesce(v_set.waiver_enabled, false) and not coalesce(p_waiver, false) then
+    raise exception 'waiver_required';
+  end if;
+
+  -- Local: con varios locales hay que elegir uno; con uno solo se usa ese; sin locales, el negocio es un solo lugar
+  select count(*) into v_nloc from public.locations where business_id = p_business and active;
+
+  if p_location is not null then
+    select * into v_loc from public.locations where id = p_location and business_id = p_business and active;
+    if not found then
+      raise exception 'invalid_location';
+    end if;
+    v_location := v_loc.id;
+  elsif v_nloc = 1 then
+    select * into v_loc from public.locations where business_id = p_business and active;
+    v_location := v_loc.id;
+  elsif v_nloc > 1 then
+    raise exception 'location_required';
+  end if;
+
+  -- Servicios: deben ser de ESTE negocio (y de todos los locales o del elegido).
+  -- El precio y la duración se calculan aquí, no los manda el cliente
   select
     count(*),
     coalesce(sum(s.price), 0),
@@ -417,7 +544,8 @@ begin
   into v_found, v_price, v_duration, v_services
   from public.services s
   where s.business_id = p_business
-    and s.id = any(p_service_ids);
+    and s.id = any(p_service_ids)
+    and (s.location_id is null or s.location_id = v_location);
 
   select count(distinct x) into v_requested from unnest(coalesce(p_service_ids, '{}'::uuid[])) as x;
 
@@ -425,30 +553,38 @@ begin
     raise exception 'invalid_services';
   end if;
 
-  -- Horario del negocio
-  select * into v_set from public.settings where business_id = p_business;
-  v_has_settings := found;
+  -- Horario, días de descanso y cupo: lo del local si lo tiene; si no, lo del negocio
+  v_work_start := coalesce(v_loc.work_start, v_set.work_start);
+  v_work_end := coalesce(v_loc.work_end, v_set.work_end);
+  if v_loc.work_start is not null then
+    -- si el local define su horario, también define su descanso (puede ser "sin descanso")
+    v_break_start := v_loc.break_start;
+    v_break_end := v_loc.break_end;
+  else
+    v_break_start := v_set.break_start;
+    v_break_end := v_set.break_end;
+  end if;
+  v_off := coalesce(v_loc.off_days, v_set.off_days);
+  v_capacity := coalesce(v_loc.capacity, v_set.capacity, 1);
 
-  if v_has_settings then
-    if extract(dow from p_date)::integer = any(v_set.off_days) then
-      raise exception 'day_off';
-    end if;
+  if v_off is not null and extract(dow from p_date)::integer = any(v_off) then
+    raise exception 'day_off';
   end if;
 
   v_start := split_part(p_time_slot, ':', 1)::integer * 60 + split_part(p_time_slot, ':', 2)::integer;
   v_end := v_start + v_duration;
 
-  if v_has_settings then
-    if v_start < (split_part(v_set.work_start, ':', 1)::integer * 60 + split_part(v_set.work_start, ':', 2)::integer)
-       or v_start >= (split_part(v_set.work_end, ':', 1)::integer * 60 + split_part(v_set.work_end, ':', 2)::integer) then
+  if v_work_start is not null and v_work_end is not null then
+    if v_start < (split_part(v_work_start, ':', 1)::integer * 60 + split_part(v_work_start, ':', 2)::integer)
+       or v_start >= (split_part(v_work_end, ':', 1)::integer * 60 + split_part(v_work_end, ':', 2)::integer) then
       raise exception 'invalid_time';
     end if;
+  end if;
 
-    if v_set.break_start is not null and v_set.break_end is not null then
-      if v_start >= (split_part(v_set.break_start, ':', 1)::integer * 60 + split_part(v_set.break_start, ':', 2)::integer)
-         and v_start < (split_part(v_set.break_end, ':', 1)::integer * 60 + split_part(v_set.break_end, ':', 2)::integer) then
-        raise exception 'invalid_time';
-      end if;
+  if v_break_start is not null and v_break_end is not null then
+    if v_start >= (split_part(v_break_start, ':', 1)::integer * 60 + split_part(v_break_start, ':', 2)::integer)
+       and v_start < (split_part(v_break_end, ':', 1)::integer * 60 + split_part(v_break_end, ':', 2)::integer) then
+      raise exception 'invalid_time';
     end if;
   end if;
 
@@ -461,28 +597,48 @@ begin
     and right(regexp_replace(b.customer_phone, '\D', '', 'g'), 10) = right(v_digits, 10)
     and b.booking_date >= (now() at time zone 'America/Mexico_City')::date;
 
-  if v_active >= (case when v_has_settings then v_set.max_bookings_per_phone else 3 end) then
+  if v_active >= coalesce(v_set.max_bookings_per_phone, 3) then
     raise exception 'too_many_bookings';
   end if;
 
-  -- Una cita a la vez por día y negocio, para que dos personas no tomen el mismo horario
-  perform pg_advisory_xact_lock(hashtext('bookings:' || p_business::text || ':' || p_date::text));
+  -- Una cita a la vez por día y local, para que dos personas no se queden con el último lugar
+  perform pg_advisory_xact_lock(hashtext('bookings:' || p_business::text || ':' || p_date::text || ':' || coalesce(v_location::text, '')));
 
+  -- Cupo: se revisa el momento de inicio y el inicio de cada cita que empieza durante esta;
+  -- si en alguno ya están todos los lugares ocupados, el horario no está disponible
   if exists (
     select 1
-    from public.bookings b
-    where b.business_id = p_business
-      and b.booking_date = p_date
-      and (split_part(b.time_slot, ':', 1)::integer * 60 + split_part(b.time_slot, ':', 2)::integer) < v_end
-      and (split_part(b.time_slot, ':', 1)::integer * 60 + split_part(b.time_slot, ':', 2)::integer + b.total_duration) > v_start
+    from (
+      select v_start as t
+      union
+      select (split_part(b.time_slot, ':', 1)::integer * 60 + split_part(b.time_slot, ':', 2)::integer)
+      from public.bookings b
+      where b.business_id = p_business
+        and b.booking_date = p_date
+        and b.location_id is not distinct from v_location
+        and (split_part(b.time_slot, ':', 1)::integer * 60 + split_part(b.time_slot, ':', 2)::integer) > v_start
+        and (split_part(b.time_slot, ':', 1)::integer * 60 + split_part(b.time_slot, ':', 2)::integer) < v_end
+    ) pts
+    where (
+      select count(*)
+      from public.bookings b2
+      where b2.business_id = p_business
+        and b2.booking_date = p_date
+        and b2.location_id is not distinct from v_location
+        and (split_part(b2.time_slot, ':', 1)::integer * 60 + split_part(b2.time_slot, ':', 2)::integer) <= pts.t
+        and (split_part(b2.time_slot, ':', 1)::integer * 60 + split_part(b2.time_slot, ':', 2)::integer + b2.total_duration) > pts.t
+    ) >= v_capacity
   ) then
     raise exception 'slot_taken';
   end if;
 
   insert into public.bookings (
-    business_id, customer_name, customer_phone, services, total_price, total_duration, booking_date, time_slot
+    business_id, customer_name, customer_phone, services, total_price, total_duration, booking_date, time_slot,
+    location_id, waiver_accepted_at
   ) values (
-    p_business, trim(p_name), trim(p_phone), v_services, v_price, v_duration, p_date, p_time_slot
+    p_business, trim(p_name), trim(p_phone), v_services, v_price, v_duration, p_date, p_time_slot,
+    v_location,
+    case when coalesce(v_set.waiver_enabled, false) then now() else null end
   )
   returning id into v_id;
 
@@ -490,12 +646,15 @@ begin
 end;
 $$;
 
-grant execute on function public.create_booking(uuid, text, text, uuid[], date, text) to anon, authenticated;
+grant execute on function public.create_booking(uuid, text, text, uuid[], date, text, uuid, boolean) to anon, authenticated;
 
 -- 7) MIS RESERVAS (el cliente ve y cancela sus propias citas) -------------
 -- Se busca por celular (se comparan los últimos 10 dígitos). Para no exponer
 -- datos personales, la búsqueda NO regresa nombre ni teléfono, solo muestra
 -- citas de hoy en adelante, y solo se cancela una cita si el celular coincide.
+
+-- Cambió la lista de datos (ahora dice el local): se quita la versión anterior
+drop function if exists public.get_my_bookings(uuid, text);
 
 create or replace function public.get_my_bookings(p_business uuid, p_phone text)
 returns table (
@@ -504,7 +663,9 @@ returns table (
   time_slot text,
   services jsonb,
   total_price integer,
-  total_duration integer
+  total_duration integer,
+  location_id uuid,
+  location_name text
 )
 language plpgsql
 stable
@@ -520,8 +681,9 @@ begin
   end if;
 
   return query
-    select b.id, b.booking_date, b.time_slot, b.services, b.total_price, b.total_duration
+    select b.id, b.booking_date, b.time_slot, b.services, b.total_price, b.total_duration, b.location_id, l.name
     from public.bookings b
+    left join public.locations l on l.id = b.location_id
     where b.business_id = p_business
       and right(regexp_replace(b.customer_phone, '\D', '', 'g'), 10) = right(v_digits, 10)
       and b.booking_date >= (now() at time zone 'America/Mexico_City')::date
@@ -566,6 +728,7 @@ begin
     E'👤 ' || v_row.customer_name || E'\n' ||
     E'📅 ' || public.format_slot_es(v_row.booking_date, v_row.time_slot) || E'\n' ||
     E'✂️ ' || coalesce((select string_agg(e ->> 'title', ', ') from jsonb_array_elements(v_row.services) e), '') || E'\n' ||
+    coalesce(E'📍 ' || (select l.name from public.locations l where l.id = v_row.location_id) || E'\n', '') ||
     E'📱 ' || v_row.customer_phone
   );
 
@@ -668,6 +831,7 @@ begin
     E'📅 ' || public.format_slot_es(new.booking_date, new.time_slot) || E'\n' ||
     E'✂️ ' || coalesce((select string_agg(e ->> 'title', ', ') from jsonb_array_elements(new.services) e), '') || E'\n' ||
     E'💵 $' || to_char(new.total_price, 'FM999,999,990') || E'\n' ||
+    coalesce(E'📍 ' || (select l.name from public.locations l where l.id = new.location_id) || E'\n', '') ||
     E'📱 ' || new.customer_phone
   );
   return new;
@@ -687,6 +851,37 @@ begin
     create trigger bookings_notify_insert
       after insert on public.bookings
       for each row execute function public.notify_new_booking();
+  end if;
+end;
+$$;
+
+-- Al crear el PRIMER local de un negocio, las citas que ya tenía pasan a ese local
+create or replace function public.locations_assign_first()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (select count(*) from public.locations l where l.business_id = new.business_id) = 1 then
+    update public.bookings set location_id = new.id
+    where business_id = new.business_id and location_id is null;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.locations_assign_first() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_trigger
+    where tgname = 'locations_assign_first_insert' and tgrelid = 'public.locations'::regclass
+  ) then
+    create trigger locations_assign_first_insert
+      after insert on public.locations
+      for each row execute function public.locations_assign_first();
   end if;
 end;
 $$;
@@ -849,7 +1044,8 @@ stable
 security definer
 set search_path = public
 as $$
-  select * from public.get_my_bookings(public.legacy_business_id(), p_phone);
+  select m.id, m.booking_date, m.time_slot, m.services, m.total_price, m.total_duration
+  from public.get_my_bookings(public.legacy_business_id(), p_phone) m;
 $$;
 
 create or replace function public.cancel_my_booking(p_booking_id uuid, p_phone text)

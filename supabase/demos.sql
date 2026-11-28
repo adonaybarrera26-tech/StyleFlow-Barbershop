@@ -11,7 +11,7 @@
 --   app.tudominio.com/demo-pole         (tema "esencia": noche violeta y dorado)
 --
 -- Los datos son inventados (teléfono de prueba, direcciones de ejemplo). Los logos están en public/demos/.
--- Requiere haber ejecutado antes supabase/schema.sql.
+-- Requiere haber ejecutado antes supabase/schema.sql (la versión con locales, cupo y deslinde).
 
 do $$
 declare
@@ -150,10 +150,30 @@ begin
     theme = '', brand_color = '', logo_url = 'demos/pole-essence.webp'
   where id = v_id;
 
+  -- Clases con cupo y deslinde: "capacity" son los lugares por horario (cada local puede tener el suyo)
   update public.settings set
     work_start = '09:00', work_end = '21:00', break_start = '14:00', break_end = '17:00',
-    off_days = '{0}', slot_interval = 60
+    off_days = '{0}', slot_interval = 60,
+    capacity = 1, waiver_enabled = true, waiver_text = ''
   where business_id = v_id;
+
+  -- Dos locales de ejemplo. Sá Sicarú: clases grupales de 6 lugares, con el horario general.
+  -- Frecuencia 528: 2 lugares, con su propio horario (10 a 20 h, sin descanso, cierra sábado y domingo).
+  insert into public.locations (business_id, name, sort_order)
+  select v_id, n, o from (values ('Sá Sicarú', 1), ('Frecuencia 528', 2)) as t(n, o)
+  where not exists (select 1 from public.locations where business_id = v_id and name = t.n);
+
+  update public.locations set
+    address = 'Calle Ejemplo 12, Huixquilucan, Estado de México', maps_url = '', capacity = 6,
+    work_start = null, work_end = null, break_start = null, break_end = null, off_days = null, slot_interval = null,
+    sort_order = 1, active = true
+  where business_id = v_id and name = 'Sá Sicarú';
+
+  update public.locations set
+    address = 'Calle Ejemplo 48, Interlomas, Estado de México', maps_url = '', capacity = 2,
+    work_start = '10:00', work_end = '20:00', break_start = null, break_end = null, off_days = '{0,6}', slot_interval = null,
+    sort_order = 2, active = true
+  where business_id = v_id and name = 'Frecuencia 528';
 
   delete from public.services where business_id = v_id;
   insert into public.services (business_id, title, price, duration_minutes, description, sort_order)
@@ -166,6 +186,13 @@ begin
     {"t":"Semi personalizada","p":120,"d":60,"x":"2 alumnas, cada quien con su tubo"},
     {"t":"Clase privada 1 a 1","p":200,"d":60,"x":"Plan a tu medida y atención exclusiva"}
   ]'::jsonb) with ordinality as e(x, n);
+
+  -- Cada clase se ofrece solo en su local
+  update public.services s set location_id = l.id
+  from public.locations l
+  where s.business_id = v_id and l.business_id = v_id
+    and ((l.name = 'Sá Sicarú' and s.title in ('Pole Básico', 'Pole Intermedio', 'Pole Avanzado', 'Pole Exotic'))
+      or (l.name = 'Frecuencia 528' and s.title in ('Semi personalizada', 'Clase privada 1 a 1')));
 
   insert into public.admins (business_id, email)
   select v_id, lower(trim(v_admin))

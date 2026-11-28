@@ -33,13 +33,17 @@ interface QuickAction {
 
 const Home: React.FC = () => {
   const { t } = useLanguage();
-  const { business, path } = useBusiness();
+  const { business, path, locations } = useBusiness();
   const { icon: CategoryIcon, hero } = getCategory(business.category);
+  const hasLocations = locations.length > 0;
 
   // Botones de acción rápida. Los que el negocio no tiene capturados no se muestran.
   const quickActions: QuickAction[] = [
     { label: 'Llamar', href: buildCallLink(business), icon: <Phone size={24} />, external: false },
-    { label: 'Cómo llegar', href: buildMapsLink(business), icon: <MapPin size={24} />, external: true },
+    // Con varios locales no hay un solo "Cómo llegar": cada local lleva su propio mapa más abajo
+    ...(locations.length > 1
+      ? []
+      : [{ label: 'Cómo llegar', href: buildMapsLink(locations[0] && locations[0].address ? locations[0] : business), icon: <MapPin size={24} />, external: true }]),
     { label: 'Instagram', href: business.instagramUrl, icon: <Instagram size={24} />, external: true },
     { label: 'Facebook', href: business.facebookUrl, icon: <Facebook size={24} />, external: true },
     { label: 'TikTok', href: business.tiktokUrl, icon: <TikTokIcon size={24} />, external: true },
@@ -101,10 +105,31 @@ const Home: React.FC = () => {
             </li>
           ))}
         </ul>
-        <p className="mt-4 inline-flex items-center justify-center gap-1.5 text-sm text-slate-400">
-          <MapPin size={14} aria-hidden="true" />
-          {business.address}
-        </p>
+        {locations.length > 1 ? (
+          <ul className="mt-6 grid w-full max-w-md gap-2 text-left">
+            {locations.map(l => (
+              <li key={l.id}>
+                <a
+                  href={buildMapsLink(l.address || l.mapsUrl ? l : business)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-900/70 p-3 transition-colors hover:border-amber-500"
+                >
+                  <MapPin size={16} className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true" />
+                  <span>
+                    <span className="block text-sm font-semibold text-white">{l.name}</span>
+                    {l.address && <span className="block text-xs text-slate-400">{l.address}</span>}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 inline-flex items-center justify-center gap-1.5 text-sm text-slate-400">
+            <MapPin size={14} aria-hidden="true" />
+            {hasLocations && locations[0].address ? locations[0].address : business.address}
+          </p>
+        )}
       </nav>
 
       {/* Detalles del servicio */}

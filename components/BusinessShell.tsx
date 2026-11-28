@@ -1,8 +1,8 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Outlet, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { Business } from '../types';
-import { getBusiness } from '../services/dataService';
+import { Business, BusinessLocation } from '../types';
+import { getBusiness, getLocations } from '../services/dataService';
 import { BusinessProvider } from '../services/BusinessContext';
 import { applyTheme, DEFAULT_LOOK } from '../services/themes';
 import Layout from './Layout';
@@ -10,7 +10,7 @@ import NotFound from '../pages/NotFound';
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'ready'; business: Business }
+  | { status: 'ready'; business: Business; locations: BusinessLocation[] }
   | { status: 'notfound' }
   | { status: 'error' };
 
@@ -24,8 +24,14 @@ const BusinessShell: React.FC = () => {
     let cancelled = false;
     setState({ status: 'loading' });
     getBusiness(slug.toLowerCase())
-      .then(business => {
-        if (!cancelled) setState(business ? { status: 'ready', business } : { status: 'notfound' });
+      .then(async business => {
+        if (!business) return null;
+        // Si no se pueden leer los locales, el negocio se muestra como un solo lugar
+        const all = await getLocations(business.id).catch(() => [] as BusinessLocation[]);
+        return { business, locations: all.filter(l => l.active) };
+      })
+      .then(result => {
+        if (!cancelled) setState(result ? { status: 'ready', ...result } : { status: 'notfound' });
       })
       .catch(error => {
         console.error('No se pudo cargar el negocio', error);
@@ -35,6 +41,19 @@ const BusinessShell: React.FC = () => {
       cancelled = true;
     };
   }, [slug, attempt]);
+
+  // Vuelve a leer los locales sin recargar la página (después de que el dueño los edita en el panel)
+  const businessId = state.status === 'ready' ? state.business.id : null;
+  const refreshLocations = useCallback(async () => {
+    if (!businessId) return;
+    const all = await getLocations(businessId).catch(() => null);
+    if (!all) return;
+    setState(prev =>
+      prev.status === 'ready' && prev.business.id === businessId
+        ? { ...prev, locations: all.filter(l => l.active) }
+        : prev
+    );
+  }, [businessId]);
 
   // Colores, letra y formas del negocio según su giro; sin negocio (cargando o con error) se ve el look base
   useLayoutEffect(() => {
@@ -81,7 +100,7 @@ const BusinessShell: React.FC = () => {
   }
 
   return (
-    <BusinessProvider business={state.business} key={state.business.id}>
+    <BusinessProvider business={state.business} locations={state.locations} refreshLocations={refreshLocations} key={state.business.id}>
       <Layout>
         <Outlet />
       </Layout>
