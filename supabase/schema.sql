@@ -193,6 +193,42 @@ create index if not exists bookings_professional_idx on public.bookings (profess
 alter table public.bookings add column if not exists folio text;
 create unique index if not exists bookings_folio_idx on public.bookings (business_id, folio) where folio is not null;
 
+-- Estado de la cita: pendiente o confirmada (la confirma el negocio desde el panel)
+alter table public.bookings add column if not exists status text not null default 'pending';
+alter table public.bookings add column if not exists confirmed_at timestamptz;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'bookings_status_check') then
+    alter table public.bookings
+      add constraint bookings_status_check check (status in ('pending', 'confirmed'));
+  end if;
+end $$;
+
+-- confirmed_at lo pone la base sola cuando cambia el estado
+create or replace function public.bookings_set_confirmed_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.status = 'confirmed' and old.status is distinct from 'confirmed' then
+    new.confirmed_at := now();
+  elsif new.status = 'pending' then
+    new.confirmed_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'bookings_set_confirmed_at' and tgrelid = 'public.bookings'::regclass) then
+    create trigger bookings_set_confirmed_at
+      before update of status on public.bookings
+      for each row execute function public.bookings_set_confirmed_at();
+  end if;
+end $$;
+
 -- Correos con permiso de administrador (cada uno, en su negocio)
 create table if not exists public.admins (
   business_id uuid references public.businesses(id) on delete cascade,
@@ -450,6 +486,18 @@ grant update (name, address, maps_url, capacity, work_start, work_end, break_sta
   slot_interval, sort_order, active)
   on public.locations to authenticated;
 grant select, delete on public.bookings to authenticated;
+
+-- Solo el administrador del negocio puede cambiar el estado de una cita, y únicamente ese dato
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'bookings' and policyname = 'bookings_update') then
+    create policy bookings_update on public.bookings
+      for update to authenticated
+      using (public.is_business_admin(business_id))
+      with check (public.is_business_admin(business_id));
+  end if;
+end $$;
+grant update (status) on public.bookings to authenticated;
 
 -- 5) HORARIOS OCUPADOS (sin datos personales) ---------------------------
 
@@ -1234,7 +1282,7 @@ update public.bookings set folio = public.gen_folio(business_id) where folio is 
 
 -- Los datos del ticket de las citas de un celular (de hoy en adelante). Igual que get_my_bookings,
 -- pero agrega folio, dirección y mapa de la sucursal, el profesional y si ya aceptó el deslinde. No regresa nombre ni celular.
--- Cambió la lista de datos (ahora dice el profesional): se quita la versión anterior
+-- Cambió la lista de datos (ahora dice el estado de la cita): se quita la versión anterior
 drop function if exists public.get_my_tickets(uuid, text);
 
 create or replace function public.get_my_tickets(p_business uuid, p_phone text)
@@ -1252,7 +1300,8 @@ returns table (
   folio text,
   waiver_accepted boolean,
   professional_id uuid,
-  professional_name text
+  professional_name text,
+  status text
 )
 language plpgsql
 stable
@@ -1270,7 +1319,7 @@ begin
   return query
     select b.id, b.booking_date, b.time_slot, b.services, b.total_price, b.total_duration,
            b.location_id, l.name, l.address, l.maps_url, b.folio, (b.waiver_accepted_at is not null),
-           b.professional_id, pr.name
+           b.professional_id, pr.name, b.status
     from public.bookings b
     left join public.locations l on l.id = b.location_id
     left join public.professionals pr on pr.id = b.professional_id

@@ -1,4 +1,4 @@
-import { MyBooking } from '../types';
+import { Booking, MyBooking } from '../types';
 import { formatMXN, formatTime, getDateParts } from './format';
 
 // Todo lo que el ticket de la cita necesita además de la cita misma
@@ -47,6 +47,25 @@ export const buildConfirmMessage = (t: MyBooking, businessName: string, customer
     `• Servicios: ${t.services.map(s => s.title).join(', ')}\n` +
     `• Total: ${formatMXN(t.totalPrice)}\n` +
     `Quedo atento a su confirmación. ¡Gracias!`
+  );
+};
+
+// Lo que el negocio le manda al cliente cuando confirma su cita (se abre en WhatsApp con el texto ya escrito)
+export const buildBookingConfirmedMessage = (
+  b: Booking,
+  ctx: { businessName: string; siteUrl: string; locationName?: string; locationAddress?: string; professionalName?: string }
+): string => {
+  const { weekday, full } = getDateParts(dayFromIso(b.date));
+  const firstName = b.customerName.trim().split(/\s+/)[0];
+  return (
+    `Hola ${firstName}, te escribimos de ${ctx.businessName}. Tu cita quedó confirmada ✅\n` +
+    (b.folio ? `• Folio: ${b.folio}\n` : '') +
+    `• Fecha: ${weekday}, ${full}\n` +
+    `• Hora: ${formatTime(b.timeSlot)}\n` +
+    `• Servicios: ${b.selectedServices.map(s => s.title).join(', ')}\n` +
+    (ctx.professionalName ? `• Con: ${ctx.professionalName}\n` : '') +
+    (ctx.locationName ? `• Sucursal: ${ctx.locationName}${ctx.locationAddress ? ` (${ctx.locationAddress})` : ''}\n` : '') +
+    `Te esperamos. Si necesitas cambiarla, puedes reagendarla o cancelarla desde Mis reservas: ${ctx.siteUrl}/mis-reservas ¡Gracias!`
   );
 };
 

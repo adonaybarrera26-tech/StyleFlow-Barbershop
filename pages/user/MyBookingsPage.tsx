@@ -8,6 +8,7 @@ import { getCategory } from '../../services/categories';
 import { buildWhatsAppLink, formatMXN, formatTime, getDateParts, isValidMexicanPhone } from '../../services/format';
 import { buildCancelMessage } from '../../services/ticket';
 import { CancelConfirmModal, CancelledNotice } from '../../components/CancelDialogs';
+import StatusChip from '../../components/StatusChip';
 
 const PHONE_ERROR = 'Escribe un número de celular válido de 10 dígitos.';
 
@@ -139,9 +140,12 @@ const MyBookingsPage: React.FC = () => {
             const { weekday, full } = getDateParts(new Date(b.date));
             return (
               <div key={b.id} className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-                {b.folio && (
-                  <p className="text-xs text-slate-500">Folio <span className="font-display text-lg tracking-[0.2em] text-amber-500 ml-1">{b.folio}</span></p>
-                )}
+                <div className="flex items-center justify-between gap-3">
+                  {b.folio ? (
+                    <p className="text-xs text-slate-500">Folio <span className="font-display text-lg tracking-[0.2em] text-amber-500 ml-1">{b.folio}</span></p>
+                  ) : <span />}
+                  <StatusChip status={b.status} />
+                </div>
                 <div className="flex justify-between items-start gap-4">
                   <div>
                     <p className="text-amber-500 font-bold flex items-center gap-2"><Calendar size={16} /> {weekday}</p>
