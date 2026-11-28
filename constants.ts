@@ -1,4 +1,4 @@
-import { Service, ShopSettings } from './types';
+import { Promotion, Service, ShopSettings } from './types';
 
 // ============================================================
 // DATOS DEL NEGOCIO — cambia aquí lo que quieras personalizar
@@ -12,7 +12,23 @@ export const SHOP_INFO = {
   displayPhone: '56 1752 7272',
   // Dirección de ejemplo: cámbiala por la real
   address: 'Calle Ejemplo 123, Col. Centro, Ciudad de México',
+  // Redes sociales de ejemplo (llevan a la página principal de cada red): pon el link de la barbería.
+  // Si dejas una en blanco ('') su botón no aparece en la portada.
+  instagramUrl: 'https://www.instagram.com/',
+  facebookUrl: 'https://www.facebook.com/',
+  tiktokUrl: 'https://www.tiktok.com/',
+  // Link de Google Maps. En blanco, el botón "Cómo llegar" busca la dirección de arriba.
+  mapsUrl: '',
+  // Detalles que se muestran como etiquetas en la portada (déjalo vacío para ocultarlas)
+  perks: ['Cafecito de cortesía', 'Música a tu gusto', 'Toalla caliente en la barba'],
 };
+
+// Promociones de ejemplo de la portada. Son informativas: el cliente las pide por WhatsApp
+// (el precio de la reserva en línea sigue siendo el normal). Deja la lista vacía para ocultarlas.
+export const PROMOTIONS: Promotion[] = [
+  { id: 'lunes-corte', title: 'Lunes de corte', description: 'Corte de cabello con máquina y tijera', days: 'Solo los lunes', normalPrice: 150, promoPrice: 120 },
+  { id: 'martes-barba', title: 'Martes de barbones', description: 'Corte de cabello y arreglo de barba', days: 'Solo los martes', normalPrice: 250, promoPrice: 210 },
+];
 
 // Acceso al panel de administración (solo para demostración).
 // Nota: al ser una app sin servidor, esta contraseña viaja en el código de la página.

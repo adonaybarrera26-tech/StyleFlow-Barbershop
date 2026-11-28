@@ -13,6 +13,7 @@ Sistema de citas en línea para barbería, en español (México) y con precios e
 - **Avisos por Telegram al barbero (opcional):** llega un mensaje con cada cita nueva y cada cancelación del cliente, aunque el panel esté cerrado. Es gratis; los pasos para activarlo están en la sección 9 de `supabase/schema.sql`. El token del bot se guarda en Supabase Vault, nunca en el código
 - **Límite de citas por celular:** por defecto 3 citas próximas por número, para que nadie bloquee la agenda. Se cambia en el panel, en Configuración → Citas por cliente. (Si ya tenías la base creada, vuelve a ejecutar `supabase/schema.sql`: es seguro repetirlo.)
 - **Exportar a Excel e imprimir** la agenda del día o de todas las citas
+- **Portada con botones de acción:** llamar, cómo llegar, Instagram, Facebook y TikTok, más etiquetas de detalles y promociones
 - **Diseño oscuro** que funciona bien en celular y en computadora
 
 ## ⚙️ Cómo personalizarlo
@@ -23,6 +24,9 @@ Todo lo importante está en [`constants.ts`](./constants.ts):
 |-------------|-------|
 | Nombre de la barbería, dirección y teléfono | `SHOP_INFO` |
 | Número de WhatsApp (lada + 10 dígitos, sin espacios) | `SHOP_INFO.whatsappNumber` |
+| Instagram, Facebook, TikTok y mapa de la portada (en blanco = el botón no aparece) | `SHOP_INFO.instagramUrl`, `facebookUrl`, `tiktokUrl`, `mapsUrl` |
+| Etiquetas de detalles de la portada (bebida de cortesía, etc.) | `SHOP_INFO.perks` |
+| Promociones de la portada (se piden por WhatsApp; no cambian el precio de la reserva en línea) | `PROMOTIONS` |
 | Usuario y contraseña del panel | `ADMIN_CREDENTIALS` |
 | Servicios y precios iniciales | `INITIAL_SERVICES` |
 | Horario y días de descanso iniciales | `DEFAULT_SETTINGS` |

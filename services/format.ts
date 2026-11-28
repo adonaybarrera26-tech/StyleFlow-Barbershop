@@ -61,6 +61,13 @@ export const lastTenDigits = (phone: string): string => phone.replace(/\D/g, '')
 export const buildWhatsAppLink = (message: string): string =>
   `https://wa.me/${SHOP_INFO.whatsappNumber}?text=${encodeURIComponent(message)}`;
 
+// Enlace para llamar por teléfono a la barbería
+export const buildCallLink = (): string => `tel:+${SHOP_INFO.whatsappNumber}`;
+
+// Enlace de Google Maps: el que se escribió en SHOP_INFO.mapsUrl o, si está en blanco, una búsqueda de la dirección
+export const buildMapsLink = (): string =>
+  SHOP_INFO.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(SHOP_INFO.address)}`;
+
 // Celular de un cliente en formato internacional para wa.me (México: 52 + 10 dígitos)
 export const toWhatsAppNumber = (phone: string): string => {
   const digits = phone.replace(/\D/g, '');
