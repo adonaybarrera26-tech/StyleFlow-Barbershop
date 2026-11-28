@@ -74,8 +74,19 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   breakEndTime: null,
   offDays: [0], // Domingo (en JavaScript getDay(): 0 = domingo, 1 = lunes ... 6 = sábado)
   slotInterval: 30,
-  maxBookingsPerPhone: 3 // citas próximas que puede tener un mismo celular
+  maxBookingsPerPhone: 3, // citas próximas que puede tener un mismo celular
+  capacity: 1, // lugares por horario (barbería con 3 sillas = 3; estudio con 6 tubos = 6)
+  waiverEnabled: false,
+  waiverText: ''
 };
+
+// Deslinde que se muestra cuando el negocio lo activa y no escribió el suyo
+export const DEFAULT_WAIVER_TEXT =
+  'Declaro que estoy en condiciones físicas adecuadas para tomar mi clase y que no tengo ninguna condición médica que me lo impida. ' +
+  'Entiendo que la actividad física implica riesgos y los asumo de manera voluntaria. ' +
+  'Me comprometo a seguir las indicaciones del personal y el reglamento del local, y a avisar si cambia mi estado de salud. ' +
+  'Libero al negocio y a su personal de responsabilidad por lesiones que resulten de mi propia imprudencia o de no haber avisado sobre alguna condición. ' +
+  'Soy mayor de edad o cuento con la autorización de mi madre, padre o tutor.';
 
 // Base de datos en línea (Supabase).
 // Si se dejan vacíos, la app funciona en "modo demo": guarda todo solo en el navegador.

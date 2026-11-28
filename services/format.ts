@@ -64,9 +64,9 @@ export const buildWhatsAppLink = (business: Business, message: string): string =
 // Enlace para llamar por teléfono al negocio
 export const buildCallLink = (business: Business): string => `tel:+${business.whatsappNumber}`;
 
-// Enlace de Google Maps: el del negocio o, si está en blanco, una búsqueda de su dirección
-export const buildMapsLink = (business: Business): string =>
-  business.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`;
+// Enlace de Google Maps: el del negocio (o local) o, si está en blanco, una búsqueda de su dirección
+export const buildMapsLink = (place: { mapsUrl: string; address: string }): string =>
+  place.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.address)}`;
 
 // Celular de un cliente en formato internacional para wa.me (México: 52 + 10 dígitos)
 export const toWhatsAppNumber = (phone: string): string => {
