@@ -1,23 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Booking, BusinessLocation, Service, BusinessSettings } from '../../types';
-import { getBookings, getServices, getLocations, saveService, deleteService, deleteBooking, getBusinessSettings, saveBusinessSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin } from '../../services/dataService';
-import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw, MessageCircle, MapPin } from 'lucide-react';
+import { Booking, BusinessLocation, Professional, Service, BusinessSettings } from '../../types';
+import { getBookings, getServices, getLocations, getProfessionals, saveService, deleteService, deleteBooking, getBusinessSettings, saveBusinessSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin } from '../../services/dataService';
+import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw, MessageCircle, MapPin, User } from 'lucide-react';
 import { DEFAULT_SETTINGS, DEFAULT_WAIVER_TEXT } from '../../constants';
 import { useBusiness } from '../../services/BusinessContext';
 import { formatMXN, formatTime, formatDateTimeShort, getDateParts, escapeHtml, buildCustomerWhatsAppLink } from '../../services/format';
 import AdminSummary from './AdminSummary';
 import AdminLocations, { WEEK_DAYS } from './AdminLocations';
+import AdminProfessionals from './AdminProfessionals';
 
 const AdminDashboard: React.FC = () => {
   const { business, path, url: businessUrl, refreshLocations } = useBusiness();
-  const [activeTab, setActiveTab] = useState<'summary' | 'bookings' | 'services' | 'locations' | 'settings'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'bookings' | 'services' | 'locations' | 'team' | 'settings'>('summary');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   // Todas las sucursales del negocio (también las ocultas)
   const [locations, setLocations] = useState<BusinessLocation[]>([]);
-  // Filtro de la lista de citas: '' = todas las sucursales
+  // Todos los profesionales del negocio (también los ocultos)
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  // Filtros de la lista de citas: '' = todas las sucursales / todos los profesionales
   const [locationFilter, setLocationFilter] = useState('');
+  const [proFilter, setProFilter] = useState('');
   const [settings, setSettings] = useState<BusinessSettings>(DEFAULT_SETTINGS);
   const [editingService, setEditingService] = useState<Partial<Service> | null>(null);
   const [showTodayOnly, setShowTodayOnly] = useState(false);
@@ -85,6 +89,7 @@ const AdminDashboard: React.FC = () => {
         const config = await getBusinessSettings(business.id);
         // Si no se pueden leer las sucursales, el panel sigue funcionando como un solo lugar
         const locs = await getLocations(business.id).catch(() => [] as BusinessLocation[]);
+        const pros = await getProfessionals(business.id).catch(() => [] as Professional[]);
 
         // Ordenar citas: día ascendente y luego hora ascendente
         const sortedBookings = b.sort((a, b) => {
@@ -102,6 +107,7 @@ const AdminDashboard: React.FC = () => {
         setBookings(sortedBookings);
         setServices(s);
         setLocations(locs);
+        setProfessionals(pros);
         // La actualización automática no toca la configuración: así no borra lo que se esté editando sin guardar
         if (!silent) setSettings(config);
     } catch (error) {
@@ -135,6 +141,7 @@ const AdminDashboard: React.FC = () => {
         'Cliente': b.customerName,
         'Celular': b.customerPhone,
         ...(locations.length > 0 ? { 'Sucursal': locationName(b) } : {}),
+        ...(professionals.length > 0 ? { 'Con': proName(b) } : {}),
         'Servicios': b.selectedServices.map(s => s.title).join(', '),
         'Fecha': full,
         'Hora': formatTime(b.timeSlot),
@@ -207,6 +214,7 @@ const AdminDashboard: React.FC = () => {
                                           <th width="22%">Cliente</th>
                                           <th width="18%">Celular</th>
                                           ${locations.length > 0 ? '<th width="15%">Sucursal</th>' : ''}
+                                          ${professionals.length > 0 ? '<th width="12%">Con</th>' : ''}
                                           <th width="22%">Servicios</th>
                                           <th width="12%">Total (MXN)</th>
                                       </tr>
@@ -219,6 +227,7 @@ const AdminDashboard: React.FC = () => {
                                               <td>${escapeHtml(b.customerName)}</td>
                                               <td>${escapeHtml(b.customerPhone)}</td>
                                               ${locations.length > 0 ? `<td>${escapeHtml(locationName(b))}</td>` : ''}
+                                              ${professionals.length > 0 ? `<td>${escapeHtml(proName(b))}</td>` : ''}
                                               <td>${escapeHtml(b.selectedServices.map(s => s.title).join(', '))}</td>
                                               <td>${escapeHtml(formatMXN(b.totalPrice))}</td>
                                           </tr>
@@ -335,8 +344,14 @@ const AdminDashboard: React.FC = () => {
       return locations.find(l => l.id === b.locationId)?.name || '';
   }
 
+  // Nombre del profesional de una cita ('' si el negocio no usa profesionales o la cita es anterior a ellos)
+  function proName(b: Booking): string {
+      return professionals.find(p => p.id === b.professionalId)?.name || '';
+  }
+
   const getDisplayedBookings = () => {
-      const inLocation = (b: Booking) => !locationFilter || b.locationId === locationFilter;
+      const inLocation = (b: Booking) =>
+          (!locationFilter || b.locationId === locationFilter) && (!proFilter || b.professionalId === proFilter);
       if (showTodayOnly) {
           const today = new Date();
           const todayVal = today.getFullYear() * 10000 + today.getMonth() * 100 + today.getDate();
@@ -573,6 +588,13 @@ const AdminDashboard: React.FC = () => {
           {activeTab === 'locations' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
         </button>
         <button
+          onClick={() => setActiveTab('team')}
+          className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'team' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+          Equipo
+          {activeTab === 'team' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"></div>}
+        </button>
+        <button
           onClick={() => setActiveTab('settings')}
           className={`pb-3 px-4 font-medium transition-colors whitespace-nowrap relative ${activeTab === 'settings' ? 'text-amber-500' : 'text-slate-500 hover:text-slate-300'}`}
         >
@@ -634,6 +656,20 @@ const AdminDashboard: React.FC = () => {
                           <option value="">Todas las sucursales</option>
                           {locations.map(l => (
                               <option key={l.id} value={l.id}>{l.name}</option>
+                          ))}
+                      </select>
+                  )}
+
+                  {professionals.length > 0 && (
+                      <select
+                        value={proFilter}
+                        onChange={e => setProFilter(e.target.value)}
+                        aria-label="Filtrar citas por profesional"
+                        className="bg-slate-800 text-slate-300 px-3 py-2 rounded-lg border border-slate-700 outline-none focus:border-amber-500"
+                      >
+                          <option value="">Todo el equipo</option>
+                          {professionals.map(p => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
                           ))}
                       </select>
                   )}
@@ -732,6 +768,11 @@ const AdminDashboard: React.FC = () => {
                                         {locationName(booking) && (
                                             <div className="text-amber-500 text-xs mt-1 flex items-center gap-1">
                                                 <MapPin size={12} aria-hidden="true" /> {locationName(booking)}
+                                            </div>
+                                        )}
+                                        {proName(booking) && (
+                                            <div className="text-slate-300 text-xs mt-1 flex items-center gap-1">
+                                                <User size={12} aria-hidden="true" /> Con {proName(booking)}
                                             </div>
                                         )}
                                     </td>
@@ -873,6 +914,18 @@ const AdminDashboard: React.FC = () => {
             await loadData(true);
             await refreshLocations();
           }}
+          onSuccess={message => setNotification({ type: 'success', message })}
+          onError={handleActionError}
+        />
+      )}
+
+      {activeTab === 'team' && (
+        <AdminProfessionals
+          businessId={business.id}
+          professionals={professionals}
+          locations={locations}
+          settings={settings}
+          onChanged={() => loadData(true)}
           onSuccess={message => setNotification({ type: 'success', message })}
           onError={handleActionError}
         />

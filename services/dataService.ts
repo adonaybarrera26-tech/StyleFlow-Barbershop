@@ -1,4 +1,4 @@
-import { Booking, Business, BusinessLocation, BusinessSettings, MyBooking, Promotion, Service } from '../types';
+import { Booking, Business, BusinessLocation, BusinessSettings, MyBooking, Professional, Promotion, Service } from '../types';
 import { INITIAL_SERVICES, DEFAULT_SETTINGS, ADMIN_CREDENTIALS, DEMO_BUSINESS } from '../constants';
 import { lastTenDigits } from './format';
 import { isSupabaseEnabled, supabaseRequest, signIn, signOut, getAccessToken, checkIsAdmin } from './supabase';
@@ -17,7 +17,7 @@ import { isSupabaseEnabled, supabaseRequest, signIn, signOut, getAccessToken, ch
 // ---------------------------------------------------------------
 
 // Claves de almacenamiento en el navegador (una por negocio)
-const storageKey = (kind: 'services' | 'bookings' | 'settings' | 'locations', businessId: string): string =>
+const storageKey = (kind: 'services' | 'bookings' | 'settings' | 'locations' | 'professionals', businessId: string): string =>
   `styleflow_${kind}_${businessId}`;
 
 // Función auxiliar para leer de LocalStorage
@@ -76,6 +76,21 @@ const mapLocation = (row: any): BusinessLocation => ({
   active: row.active !== false
 });
 
+const mapProfessional = (row: any): Professional => ({
+  id: row.id,
+  name: row.name,
+  title: row.title || '',
+  photoUrl: row.photo_url || '',
+  locationId: row.location_id ?? null,
+  workStartTime: row.work_start ?? null,
+  workEndTime: row.work_end ?? null,
+  breakStartTime: row.break_start ?? null,
+  breakEndTime: row.break_end ?? null,
+  offDays: Array.isArray(row.off_days) ? row.off_days : null,
+  sortOrder: row.sort_order ?? 0,
+  active: row.active !== false
+});
+
 const mapBooking = (row: any): Booking => ({
   id: row.id,
   customerName: row.customer_name,
@@ -88,7 +103,8 @@ const mapBooking = (row: any): Booking => ({
   createdAt: row.created_at,
   locationId: row.location_id ?? null,
   waiverAcceptedAt: row.waiver_accepted_at ?? null,
-  folio: row.folio || undefined
+  folio: row.folio || undefined,
+  professionalId: row.professional_id ?? null
 });
 
 const mapSettings = (row: any): BusinessSettings => ({
@@ -307,7 +323,8 @@ export const getTakenSlots = async (businessId: string): Promise<Booking[]> => {
       date: dateStringToIso(row.booking_date),
       timeSlot: row.time_slot,
       createdAt: '',
-      locationId: row.location_id ?? null
+      locationId: row.location_id ?? null,
+      professionalId: row.professional_id ?? null
     }));
   }
   return getBookings(businessId);
@@ -343,7 +360,8 @@ export const createBooking = async (
         p_date: toDateString(new Date(booking.date)),
         p_time_slot: booking.timeSlot,
         p_location: booking.locationId || null,
-        p_waiver: waiverAccepted
+        p_waiver: waiverAccepted,
+        p_professional: booking.professionalId || null
       }
     });
     // El folio lo genera la base de datos: se lee de la cita recién creada
@@ -418,7 +436,9 @@ export const getMyBookings = async (businessId: string, phone: string): Promise<
       locationAddress: row.location_address || undefined,
       locationMapsUrl: row.location_maps_url || undefined,
       folio: row.folio || undefined,
-      waiverAccepted: row.waiver_accepted === true
+      waiverAccepted: row.waiver_accepted === true,
+      professionalId: row.professional_id ?? null,
+      professionalName: row.professional_name || undefined
     }));
   }
 
@@ -436,7 +456,10 @@ export const getMyBookings = async (businessId: string, phone: string): Promise<
       totalPrice: b.totalPrice,
       totalDuration: b.totalDuration,
       folio: b.folio,
-      waiverAccepted: !!b.waiverAcceptedAt
+      waiverAccepted: !!b.waiverAcceptedAt,
+      locationId: b.locationId ?? null,
+      professionalId: b.professionalId ?? null,
+      professionalName: b.professionalName
     }));
 };
 
@@ -592,4 +615,66 @@ export const saveLocation = async (
     list.push({ ...location, id: Math.random().toString(36).substr(2, 9), sortOrder: list.length + 1 });
   }
   saveToStorage(storageKey('locations', businessId), list);
+};
+
+// ---------------------------------------------------------------
+// Profesionales (barberos, instructoras, doctores...)
+// ---------------------------------------------------------------
+
+// Todos los profesionales del negocio (también los ocultos), en el orden en que se muestran.
+// Si todavía no tiene, regresa una lista vacía y el negocio funciona como siempre (sin elegir con quién).
+export const getProfessionals = async (businessId: string): Promise<Professional[]> => {
+  if (isSupabaseEnabled()) {
+    const rows = await supabaseRequest<any[]>(
+      `/rest/v1/professionals?business_id=eq.${businessId}&select=*&order=sort_order.asc,created_at.asc`
+    );
+    return rows.map(mapProfessional);
+  }
+  return getFromStorage<Professional[]>(storageKey('professionals', businessId), []);
+};
+
+// Crea un profesional (sin id) o actualiza uno que ya existe. No se borran: se ocultan (active = false)
+// para no perder el historial de sus citas.
+export const saveProfessional = async (
+  businessId: string,
+  pro: Omit<Professional, 'id' | 'sortOrder'> & { id?: string; sortOrder?: number }
+): Promise<void> => {
+  if (isSupabaseEnabled()) {
+    const body: Record<string, unknown> = {
+      name: pro.name,
+      title: pro.title,
+      photo_url: pro.photoUrl,
+      location_id: pro.locationId || null,
+      work_start: pro.workStartTime,
+      work_end: pro.workEndTime,
+      break_start: pro.breakStartTime,
+      break_end: pro.breakEndTime,
+      off_days: pro.offDays,
+      active: pro.active
+    };
+
+    if (pro.id && isUuid(pro.id)) {
+      await mutate(`/rest/v1/professionals?id=eq.${pro.id}&business_id=eq.${businessId}`, 'PATCH', body);
+    } else {
+      const existing = await getProfessionals(businessId);
+      body.business_id = businessId;
+      body.sort_order = existing.length + 1;
+      await supabaseRequest('/rest/v1/professionals', {
+        method: 'POST',
+        body,
+        asAdmin: true,
+        prefer: 'return=minimal'
+      });
+    }
+    return;
+  }
+
+  const list = await getProfessionals(businessId);
+  const index = list.findIndex(p => p.id === pro.id);
+  if (index >= 0) {
+    list[index] = { ...list[index], ...pro, id: list[index].id };
+  } else {
+    list.push({ ...pro, id: Math.random().toString(36).substr(2, 9), sortOrder: list.length + 1 });
+  }
+  saveToStorage(storageKey('professionals', businessId), list);
 };

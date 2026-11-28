@@ -24,6 +24,23 @@ export interface BusinessLocation {
   active: boolean;
 }
 
+// Profesional del negocio (barbero, instructora, doctor...): tiene su foto y su propia agenda.
+// Lo que queda en blanco (null) usa lo de su sucursal o, si no, lo de la configuración general.
+export interface Professional {
+  id: string;
+  name: string;
+  title: string; // puesto o especialidad ("Barbero", "Fade y barba")
+  photoUrl: string; // link completo (https://...), foto subida (data:image/...) o archivo de la app (demos/barbero.svg)
+  locationId: string | null; // vacío = trabaja en todas las sucursales
+  workStartTime: string | null;
+  workEndTime: string | null;
+  breakStartTime: string | null;
+  breakEndTime: string | null;
+  offDays: number[] | null;
+  sortOrder: number;
+  active: boolean;
+}
+
 // Promoción que se muestra en la portada (informativa: el cliente la pide por WhatsApp)
 export interface Promotion {
   id: string;
@@ -68,6 +85,8 @@ export interface Booking {
   locationId?: string | null; // sucursal de la cita (vacío = el negocio no tiene sucursales)
   waiverAcceptedAt?: string | null; // cuándo aceptó el deslinde (si el negocio lo pide)
   folio?: string; // código de 4 letras de la cita (ej. RDRY)
+  professionalId?: string | null; // con quién es la cita (vacío = el negocio no tiene profesionales)
+  professionalName?: string; // nombre del profesional, para mostrarlo sin buscarlo
 }
 
 // Cita vista por el propio cliente en "Mis reservas": sin nombre ni teléfono
@@ -84,6 +103,8 @@ export interface MyBooking {
   locationMapsUrl?: string; // enlace de mapa de la sucursal
   folio?: string; // código de 4 letras de la cita (ej. RDRY)
   waiverAccepted?: boolean; // ya aceptó el deslinde al reservar
+  professionalId?: string | null; // con quién es la cita
+  professionalName?: string;
 }
 
 // Lo que viaja a la pantalla del ticket (y de ahí a reagendar o cancelar)

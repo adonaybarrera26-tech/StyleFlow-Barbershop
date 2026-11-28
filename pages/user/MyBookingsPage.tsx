@@ -157,6 +157,12 @@ const MyBookingsPage: React.FC = () => {
                       <span className="text-slate-200 text-right">{b.locationName}</span>
                     </div>
                   )}
+                  {b.professionalName && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-slate-500">Con</span>
+                      <span className="text-slate-200 text-right">{b.professionalName}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between gap-4">
                     <span className="text-slate-500">Servicios</span>
                     <span className="text-slate-200 text-right">{b.services.map(s => s.title).join(', ')}</span>
