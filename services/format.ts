@@ -29,6 +29,10 @@ export const getDateParts = (date: Date) => ({
   full: new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' }).format(date)
 });
 
+// Fecha local como "2026-11-26T12:00:00" (a las 12:00 para que siempre caiga en el mismo día)
+export const dateToNoonIso = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T12:00:00`;
+
 // "26/11/2026"
 export const formatDateShort = (date: Date): string =>
   new Intl.DateTimeFormat(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);

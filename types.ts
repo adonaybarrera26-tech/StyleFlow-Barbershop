@@ -67,6 +67,7 @@ export interface Booking {
   createdAt: string;
   locationId?: string | null; // sucursal de la cita (vacío = el negocio no tiene sucursales)
   waiverAcceptedAt?: string | null; // cuándo aceptó el deslinde (si el negocio lo pide)
+  folio?: string; // código de 4 letras de la cita (ej. RDRY)
 }
 
 // Cita vista por el propio cliente en "Mis reservas": sin nombre ni teléfono
@@ -78,6 +79,26 @@ export interface MyBooking {
   totalPrice: number;
   totalDuration: number;
   locationName?: string; // sucursal de la cita, si el negocio tiene sucursales
+  locationId?: string | null;
+  locationAddress?: string; // dirección de la sucursal
+  locationMapsUrl?: string; // enlace de mapa de la sucursal
+  folio?: string; // código de 4 letras de la cita (ej. RDRY)
+  waiverAccepted?: boolean; // ya aceptó el deslinde al reservar
+}
+
+// Lo que viaja a la pantalla del ticket (y de ahí a reagendar o cancelar)
+export interface TicketState {
+  ticket: MyBooking;
+  phone: string; // celular con el que se reservó: con ese mismo se reagenda o cancela
+  customerName?: string;
+  rescheduled?: boolean; // true cuando la persona acaba de reagendar
+}
+
+// Lo que viaja a la pantalla de reservar cuando se reagenda una cita
+export interface RescheduleState {
+  ticket: MyBooking;
+  phone: string;
+  customerName?: string;
 }
 
 export enum UserRole {

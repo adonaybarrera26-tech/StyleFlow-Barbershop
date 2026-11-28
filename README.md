@@ -11,10 +11,10 @@ La barbería que viene de ejemplo (`demo-barberia`) es solo la demo: el mismo c�
 - **Reserva en 3 pasos:** elegir servicios → elegir fecha y hora → confirmar
 - **Varios negocios en una sola app:** cada uno en su dirección (`/<nombre-del-negocio>`), con su nombre, giro, WhatsApp, dirección, redes, etiquetas y promociones, y sin ver los datos de los demás
 - **Giros listos:** barbería, spa, estética, dentista, nutriólogo, médico y "otro". Cada giro trae su propio look (colores, letra, formas y una ilustración en la portada), sus frases de la cinta superior y servicios de ejemplo al darlo de alta
-- **Confirmación por WhatsApp:** botón que abre WhatsApp con la cita ya escrita
-- **Mis reservas:** el cliente escribe su celular, ve sus próximas citas y puede cancelarlas (con botón para avisar al negocio por WhatsApp). Con Supabase no muestra nombres ni teléfonos de otras personas
+- **Ticket de la cita:** al reservar, el cliente ve su ticket con un **folio de 4 letras** (ej. RDRY), "te esperamos mañana", y botones para agregarlo a su calendario (archivo .ics), guardarlo como imagen, confirmar por WhatsApp, **reagendar** y **cancelar**. El folio también aparece en el panel y en los avisos de Telegram
+- **Mis reservas:** el cliente escribe su celular, ve sus próximas citas (con su folio) y desde ahí abre el ticket, las reagenda o las cancela (con botón para avisar al negocio por WhatsApp). Con Supabase no muestra nombres ni teléfonos de otras personas
 - **Panel de administración por negocio:** citas, servicios, horarios y días de descanso. Cada administrador solo entra al panel de su negocio
-- **Avisos por Telegram (opcional):** llega un mensaje con el nombre del negocio por cada cita nueva y cada cancelación del cliente. Es gratis; los pasos están en la sección 8 de `supabase/schema.sql`. El token del bot se guarda en Supabase Vault, nunca en el código
+- **Avisos por Telegram (opcional):** llega un mensaje con el nombre del negocio por cada cita nueva, cada cita reagendada y cada cancelación del cliente. Es gratis; los pasos están en la sección 8 de `supabase/schema.sql`. El token del bot se guarda en Supabase Vault, nunca en el código
 - **Límite de citas por celular:** por defecto 3 citas próximas por número, para que nadie bloquee la agenda. Se cambia en el panel, en Configuración → Citas por cliente
 - **Exportar a Excel e imprimir** la agenda del día o de todas las citas
 - **Portada con botones de acción:** llamar, cómo llegar, Instagram, Facebook y TikTok, más etiquetas de detalles y promociones (lo que el negocio no capture, no se muestra)

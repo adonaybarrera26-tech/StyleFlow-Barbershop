@@ -131,6 +131,7 @@ const AdminDashboard: React.FC = () => {
     const data = dataToExport.map(b => {
       const { full } = getFormattedDateParts(b.date);
       return {
+        'Folio': b.folio || '',
         'Cliente': b.customerName,
         'Celular': b.customerPhone,
         ...(locations.length > 0 ? { 'Sucursal': locationName(b) } : {}),
@@ -202,6 +203,7 @@ const AdminDashboard: React.FC = () => {
                                   <thead>
                                       <tr>
                                           <th width="12%">Hora</th>
+                                          <th width="9%">Folio</th>
                                           <th width="22%">Cliente</th>
                                           <th width="18%">Celular</th>
                                           ${locations.length > 0 ? '<th width="15%">Sucursal</th>' : ''}
@@ -213,6 +215,7 @@ const AdminDashboard: React.FC = () => {
                                       ${dayBookings.map(b => `
                                           <tr>
                                               <td><b>${escapeHtml(formatTime(b.timeSlot))}</b></td>
+                                              <td>${escapeHtml(b.folio || '')}</td>
                                               <td>${escapeHtml(b.customerName)}</td>
                                               <td>${escapeHtml(b.customerPhone)}</td>
                                               ${locations.length > 0 ? `<td>${escapeHtml(locationName(b))}</td>` : ''}
@@ -283,7 +286,7 @@ const AdminDashboard: React.FC = () => {
     const site = businessUrl;
     const message =
       `Hola ${firstName}, te escribimos de ${business.name}. ` +
-      `Tu cita del ${weekday.toLowerCase()} ${full} a las ${formatTime(b.timeSlot)} (${services}) se canceló. ` +
+      `Tu cita${b.folio ? ` con folio ${b.folio}` : ''} del ${weekday.toLowerCase()} ${full} a las ${formatTime(b.timeSlot)} (${services}) se canceló. ` +
       `Si quieres reagendar, puedes reservar otra aquí: ${site} ¡Gracias!`;
     return buildCustomerWhatsAppLink(b.customerPhone, message);
   };
@@ -722,7 +725,10 @@ const AdminDashboard: React.FC = () => {
                                     </td>
                                     <td className="p-4">
                                         <div className="font-bold text-white">{booking.customerName}</div>
-                                        <div className="text-slate-500 text-xs font-mono mt-1">{booking.customerPhone}</div>
+                                        <div className="text-slate-500 text-xs font-mono mt-1">
+                                            {booking.customerPhone}
+                                            {booking.folio && <span className="ml-2 text-amber-500 font-bold tracking-widest">{booking.folio}</span>}
+                                        </div>
                                         {locationName(booking) && (
                                             <div className="text-amber-500 text-xs mt-1 flex items-center gap-1">
                                                 <MapPin size={12} aria-hidden="true" /> {locationName(booking)}

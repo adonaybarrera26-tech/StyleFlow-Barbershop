@@ -1,29 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Service, Booking, BusinessLocation, BusinessSettings } from '../../types';
-import { getServices, createBooking, getTakenSlots, getBusinessSettings } from '../../services/dataService';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Service, Booking, BusinessLocation, BusinessSettings, MyBooking, RescheduleState, TicketState } from '../../types';
+import { getServices, createBooking, rescheduleMyBooking, getTakenSlots, getBusinessSettings } from '../../services/dataService';
 import { useBusiness } from '../../services/BusinessContext';
 import { getCategory } from '../../services/categories';
 import { DEFAULT_SETTINGS, DEFAULT_WAIVER_TEXT } from '../../constants';
-import { formatMXN, formatDateLong, formatDateShort, formatTime, isValidMexicanPhone } from '../../services/format';
+import { formatMXN, formatDateShort, formatTime, isValidMexicanPhone, dateToNoonIso } from '../../services/format';
+import { ticketDateText } from '../../services/ticket';
 import { effectiveSchedule, generateTimeSlots, freeSpots, toMinutes } from '../../services/slots';
-import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, Loader2, MapPin } from 'lucide-react';
+import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, Loader2, MapPin, RefreshCw } from 'lucide-react';
 
 const BookingPage: React.FC = () => {
   const navigate = useNavigate();
+  const routeState = useLocation().state as { reschedule?: RescheduleState; prefill?: { customerName?: string; phone?: string } } | null;
+  // Si llega una cita para reagendar, solo se elige otro día y otra hora (mismos servicios y sucursal)
+  const reschedule = routeState?.reschedule ?? null;
   const { business, path, locations } = useBusiness();
   // Con varias sucursales el primer paso es elegir una; con una sola se usa esa sin preguntar
   const needsLocation = locations.length > 1;
   const stepShift = needsLocation ? 1 : 0;
-  const [step, setStep] = useState(needsLocation ? 0 : 1);
-  const [selectedLocation, setSelectedLocation] = useState<BusinessLocation | null>(locations.length === 1 ? locations[0] : null);
+  const [step, setStep] = useState(reschedule ? 2 : needsLocation ? 0 : 1);
+  const [selectedLocation, setSelectedLocation] = useState<BusinessLocation | null>(
+    reschedule && reschedule.ticket.locationId
+      ? locations.find(l => l.id === reschedule.ticket.locationId) ?? null
+      : locations.length === 1 ? locations[0] : null
+  );
   const [waiverAccepted, setWaiverAccepted] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
-  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
+  const [selectedServices, setSelectedServices] = useState<Service[]>(reschedule ? reschedule.ticket.services : []);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTime, setSelectedTime] = useState<string>('');
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState(reschedule?.customerName ?? routeState?.prefill?.customerName ?? '');
+  const [customerPhone, setCustomerPhone] = useState(reschedule?.phone ?? routeState?.prefill?.phone ?? '');
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -84,9 +92,16 @@ const BookingPage: React.FC = () => {
     }
 
     // Citas del día seleccionado en esta sucursal
-    const dayBookings = allBookings.filter(b =>
+    let dayBookings = allBookings.filter(b =>
         new Date(b.date).toDateString() === dateString && (b.locationId ?? null) === (selectedLocation?.id ?? null)
     );
+
+    // Al reagendar, la cita actual se va a quitar: su horario no debe contar como ocupado
+    const isOwnDay = !!reschedule && new Date(reschedule.ticket.date).toDateString() === dateString;
+    if (isOwnDay && reschedule) {
+        const own = dayBookings.findIndex(b => b.timeSlot === reschedule.ticket.timeSlot);
+        if (own >= 0) dayBookings = dayBookings.filter((_, i) => i !== own);
+    }
 
     // La duración de lo que el cliente eligió también cuenta: un servicio de 2 horas
     // no debe caber en un hueco de 30 minutos.
@@ -103,6 +118,9 @@ const BookingPage: React.FC = () => {
             free: freeSpots(toMinutes(time), neededMinutes, schedule.capacity, dayBookings, schedule.slotInterval)
         }))
         .filter(slot => slot.free > 0);
+
+    // Al reagendar no tiene caso ofrecer el mismo horario que ya tiene
+    if (isOwnDay && reschedule) free = free.filter(slot => slot.time !== reschedule.ticket.timeSlot);
 
     // Si la fecha es hoy, quitar los horarios que ya pasaron
     const now = new Date();
@@ -172,7 +190,7 @@ const BookingPage: React.FC = () => {
       setFormError('');
       setLoading(true);
       try {
-        await createBooking(business.id, {
+        const created = await createBooking(business.id, {
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           selectedServices,
@@ -183,19 +201,23 @@ const BookingPage: React.FC = () => {
           locationId: selectedLocation?.id ?? null
         }, waiverAccepted);
 
-        // Ir a la página de confirmación
-        navigate(path('/success'), {
-            state: {
-                customerName: customerName.trim(),
-                formattedDate: formatDateLong(selectedDate),
-                timeSlot: selectedTime,
-                servicesText: selectedServices.map(s => s.title).join(', '),
-                totalPrice,
-                locationName: selectedLocation?.name,
-                locationAddress: selectedLocation?.address,
-                locationMapsUrl: selectedLocation?.mapsUrl
-            }
-        });
+        // Ir al ticket de la cita
+        const ticket: MyBooking = {
+            id: created.id,
+            date: dateToNoonIso(selectedDate),
+            timeSlot: selectedTime,
+            services: selectedServices,
+            totalPrice,
+            totalDuration,
+            locationId: selectedLocation?.id ?? null,
+            locationName: selectedLocation?.name,
+            locationAddress: selectedLocation?.address,
+            locationMapsUrl: selectedLocation?.mapsUrl,
+            folio: created.folio,
+            waiverAccepted
+        };
+        const ticketState: TicketState = { ticket, phone: customerPhone.trim(), customerName: customerName.trim() };
+        navigate(path('/success'), { state: ticketState });
 
       } catch (e) {
         const code = e instanceof Error ? e.message : '';
@@ -241,6 +263,77 @@ const BookingPage: React.FC = () => {
       }
     };
 
+  // La persona ya aceptó el deslinde cuando reservó; si el negocio lo activó después, se lo pedimos aquí
+  const needsWaiverNow = !!reschedule && settings.waiverEnabled && !reschedule.ticket.waiverAccepted;
+
+  // Deslinde: texto y casilla para aceptarlo (al reservar y, si hace falta, al reagendar)
+  const waiverBlock = (
+    <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+            <h3 className="font-bold text-white">Deslinde de responsabilidad</h3>
+            <div className="max-h-44 overflow-y-auto rounded-xl bg-slate-950 border border-slate-800 p-4 text-sm text-slate-300 leading-relaxed whitespace-pre-line">
+                {waiverText}
+            </div>
+            <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                    type="checkbox"
+                    checked={waiverAccepted}
+                    onChange={(e) => { setWaiverAccepted(e.target.checked); setFormError(''); }}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-amber-500"
+                />
+                <span className="text-sm text-slate-200">He leído y acepto el deslinde.</span>
+            </label>
+    </div>
+  );
+
+  const handleReschedule = async () => {
+      if (!reschedule) return;
+      if (needsWaiverNow && !waiverAccepted) {
+        setFormError('Para reagendar necesitas aceptar el deslinde.');
+        return;
+      }
+      setFormError('');
+      setLoading(true);
+      try {
+        const newId = await rescheduleMyBooking(
+          business.id, reschedule.ticket.id, reschedule.phone, selectedDate, selectedTime, waiverAccepted
+        );
+        const ticketState: TicketState = {
+          ticket: {
+            ...reschedule.ticket,
+            id: newId,
+            date: dateToNoonIso(selectedDate),
+            timeSlot: selectedTime,
+            waiverAccepted: reschedule.ticket.waiverAccepted || waiverAccepted
+          },
+          phone: reschedule.phone,
+          customerName: reschedule.customerName,
+          rescheduled: true
+        };
+        navigate(path('/success'), { state: ticketState, replace: true });
+      } catch (e) {
+        const code = e instanceof Error ? e.message : '';
+        if (code === 'slot_taken' || code === 'past_date' || code === 'day_off' || code === 'invalid_time') {
+          try {
+            setAllBookings(await getTakenSlots(business.id));
+          } catch (refreshError) {
+            console.error('No se pudieron actualizar los horarios', refreshError);
+          }
+          setSelectedTime('');
+          setFormError('Ese horario ya se ocupó. Elige otro, por favor.');
+        } else if (code === 'same_slot') {
+          setFormError('Elige un horario distinto al de tu cita actual.');
+        } else if (code === 'booking_not_found') {
+          setFormError('No encontramos tu cita. Puede que ya se haya cancelado o que ya haya pasado.');
+        } else if (code === 'waiver_required') {
+          setFormError('Para reagendar necesitas aceptar el deslinde.');
+        } else {
+          setFormError('No pudimos reagendar tu cita. Revisa tu internet e intenta de nuevo.');
+        }
+      } finally {
+        setLoading(false);
+      }
+  };
+
   if (loadError) {
       return (
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-center gap-4 px-6">
@@ -262,6 +355,21 @@ const BookingPage: React.FC = () => {
               <p>Cargando información...</p>
           </div>
       );
+  }
+
+  // Al reagendar, si la sucursal de la cita ya no se ofrece no se puede calcular su horario
+  if (reschedule && reschedule.ticket.locationId && !selectedLocation) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center gap-4 px-6">
+        <p className="text-slate-300">La sucursal de tu cita ya no está disponible. Cancela esta cita y reserva de nuevo, por favor.</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="sticker bg-amber-500 text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400"
+        >
+          Volver
+        </button>
+      </div>
+    );
   }
 
   // --- Paso 0 (solo si hay varias sucursales): elegir sucursal ---
@@ -388,16 +496,25 @@ const BookingPage: React.FC = () => {
 
       return (
         <div className="space-y-8 pb-40 md:pb-24 animate-in slide-in-from-right-4">
-            <button onClick={() => setStep(1)} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
-                <ChevronLeft size={16} /> Atrás
+            <button onClick={() => (reschedule ? navigate(-1) : setStep(1))} className="text-slate-400 flex items-center gap-1 hover:text-white transition-colors">
+                <ChevronLeft size={16} /> {reschedule ? 'Volver a mi ticket' : 'Atrás'}
             </button>
 
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-bold text-white">Elige fecha y hora</h2>
-                    <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso {2 + stepShift} de {3 + stepShift}</span>
+                    <h2 className="text-2xl font-bold text-white">{reschedule ? 'Reagendar tu cita' : 'Elige fecha y hora'}</h2>
+                    {!reschedule && (
+                        <span className="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-medium border border-amber-500/20">Paso {2 + stepShift} de {3 + stepShift}</span>
+                    )}
                 </div>
                 {locationBadge}
+                {reschedule && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-sm space-y-1">
+                        <p className="text-slate-500">Tu cita actual</p>
+                        <p className="text-slate-200 font-medium">{ticketDateText(reschedule.ticket)}, {formatTime(reschedule.ticket.timeSlot)}</p>
+                        <p className="text-slate-400">{reschedule.ticket.services.map(s => s.title).join(', ')}</p>
+                    </div>
+                )}
             </div>
 
             <div className="space-y-4">
@@ -472,17 +589,30 @@ const BookingPage: React.FC = () => {
                 )}
             </div>
 
+            {needsWaiverNow && waiverBlock}
+
             {/* En el celular se coloca a 70px del fondo para quedar arriba de la barra de navegación */}
             <div className="fixed bottom-[70px] md:bottom-0 left-0 right-0 p-4 bg-slate-950 border-t border-slate-800 md:static md:bg-transparent md:border-0 z-40">
                 <div className="max-w-4xl mx-auto flex justify-end">
-                    <button
-                        disabled={!selectedTime}
-                        onClick={() => setStep(3)}
-                        className="sticker bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400 flex items-center gap-2"
-                    >
-                        Continuar
-                        <ChevronRight size={20} />
-                    </button>
+                    {reschedule ? (
+                        <button
+                            disabled={!selectedTime || loading}
+                            onClick={handleReschedule}
+                            className="sticker bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400 flex items-center gap-2"
+                        >
+                            {loading ? <Loader2 size={20} className="animate-spin" /> : <RefreshCw size={20} />}
+                            {loading ? 'Guardando...' : 'Reagendar cita'}
+                        </button>
+                    ) : (
+                        <button
+                            disabled={!selectedTime}
+                            onClick={() => setStep(3)}
+                            className="sticker bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-black px-8 py-3 rounded-xl font-extrabold hover:bg-amber-400 flex items-center gap-2"
+                        >
+                            Continuar
+                            <ChevronRight size={20} />
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -532,23 +662,7 @@ const BookingPage: React.FC = () => {
             )}
         </div>
 
-        {settings.waiverEnabled && (
-            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
-                <h3 className="font-bold text-white">Deslinde de responsabilidad</h3>
-                <div className="max-h-44 overflow-y-auto rounded-xl bg-slate-950 border border-slate-800 p-4 text-sm text-slate-300 leading-relaxed whitespace-pre-line">
-                    {waiverText}
-                </div>
-                <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={waiverAccepted}
-                        onChange={(e) => { setWaiverAccepted(e.target.checked); setFormError(''); }}
-                        className="mt-0.5 h-5 w-5 shrink-0 accent-amber-500"
-                    />
-                    <span className="text-sm text-slate-200">He leído y acepto el deslinde.</span>
-                </label>
-            </div>
-        )}
+        {settings.waiverEnabled && waiverBlock}
 
         <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">
              <h3 className="font-bold text-white mb-2">Resumen de tu cita</h3>

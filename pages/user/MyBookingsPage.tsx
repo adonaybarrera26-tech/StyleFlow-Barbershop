@@ -1,29 +1,19 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Loader2, Calendar, Clock, X, CheckCircle2, MessageCircle, AlertTriangle } from 'lucide-react';
-import { MyBooking } from '../../types';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, Loader2, Calendar, Clock, RefreshCw, Ticket } from 'lucide-react';
+import { MyBooking, RescheduleState, TicketState } from '../../types';
 import { getMyBookings, cancelMyBooking } from '../../services/dataService';
 import { useBusiness } from '../../services/BusinessContext';
 import { getCategory } from '../../services/categories';
 import { buildWhatsAppLink, formatMXN, formatTime, getDateParts, isValidMexicanPhone } from '../../services/format';
+import { buildCancelMessage } from '../../services/ticket';
+import { CancelConfirmModal, CancelledNotice } from '../../components/CancelDialogs';
 
 const PHONE_ERROR = 'Escribe un número de celular válido de 10 dígitos.';
 
-// Mensaje para avisarle al negocio que se canceló la cita (no lleva el nombre: el cliente ya escribe desde su WhatsApp)
-const buildCancelMessage = (businessName: string, b: MyBooking): string => {
-  const { weekday, full } = getDateParts(new Date(b.date));
-  return (
-    `Hola, cancelé mi cita en ${businessName}:\n` +
-    (b.locationName ? `• Sucursal: ${b.locationName}\n` : '') +
-    `• Fecha: ${weekday}, ${full}\n` +
-    `• Hora: ${formatTime(b.timeSlot)}\n` +
-    `• Servicios: ${b.services.map(s => s.title).join(', ')}\n` +
-    `Gracias por su atención.`
-  );
-};
-
 const MyBookingsPage: React.FC = () => {
   const { business, path } = useBusiness();
+  const navigate = useNavigate();
   const { icon: CategoryIcon } = getCategory(business.category);
   const [phone, setPhone] = useState('');
   // Celular con el que se hizo la última búsqueda (con ese mismo se cancela)
@@ -54,6 +44,19 @@ const MyBookingsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Ver el ticket completo de una cita (con calendario, imagen, reagendar y cancelar)
+  const openTicket = (b: MyBooking) => {
+    if (!searchedPhone) return;
+    const state: TicketState = { ticket: b, phone: searchedPhone };
+    navigate(path('/success'), { state });
+  };
+
+  const openReschedule = (b: MyBooking) => {
+    if (!searchedPhone) return;
+    const state: { reschedule: RescheduleState } = { reschedule: { ticket: b, phone: searchedPhone } };
+    navigate(path('/booking'), { state });
   };
 
   const confirmCancel = async () => {
@@ -136,6 +139,9 @@ const MyBookingsPage: React.FC = () => {
             const { weekday, full } = getDateParts(new Date(b.date));
             return (
               <div key={b.id} className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                {b.folio && (
+                  <p className="text-xs text-slate-500">Folio <span className="font-display text-lg tracking-[0.2em] text-amber-500 ml-1">{b.folio}</span></p>
+                )}
                 <div className="flex justify-between items-start gap-4">
                   <div>
                     <p className="text-amber-500 font-bold flex items-center gap-2"><Calendar size={16} /> {weekday}</p>
@@ -165,6 +171,22 @@ const MyBookingsPage: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => openTicket(b)}
+                    className="py-3 rounded-xl font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Ticket size={16} aria-hidden="true" />
+                    Ver ticket
+                  </button>
+                  <button
+                    onClick={() => openReschedule(b)}
+                    className="py-3 rounded-xl font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 text-sm"
+                  >
+                    <RefreshCw size={16} aria-hidden="true" />
+                    Reagendar
+                  </button>
+                </div>
                 <button
                   onClick={() => setBookingToCancel(b)}
                   className="w-full py-3 rounded-xl font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors"
@@ -179,83 +201,24 @@ const MyBookingsPage: React.FC = () => {
 
       {/* Ventana para confirmar la cancelación */}
       {bookingToCancel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
-            <button
-              onClick={() => setBookingToCancel(null)}
-              aria-label="Cerrar"
-              className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
-            >
-              <X size={20} />
-            </button>
-
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500/10 text-red-500">
-                <AlertTriangle size={32} />
-              </div>
-              <h3 className="text-xl font-bold text-white">¿Cancelar tu cita?</h3>
-              <p className="text-slate-400">
-                Tu cita del {getDateParts(new Date(bookingToCancel.date)).full} a las {formatTime(bookingToCancel.timeSlot)} se va a cancelar y el horario quedará libre.
-              </p>
-              <div className="flex gap-3 w-full">
-                <button
-                  onClick={() => setBookingToCancel(null)}
-                  disabled={cancelling}
-                  className="flex-1 py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all"
-                >
-                  Conservar
-                </button>
-                <button
-                  onClick={confirmCancel}
-                  disabled={cancelling}
-                  className="flex-1 py-3 rounded-xl font-bold text-paper bg-red-600 hover:bg-red-700 transition-all disabled:opacity-60"
-                >
-                  {cancelling ? 'Cancelando...' : 'Sí, cancelar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CancelConfirmModal
+          ticket={bookingToCancel}
+          busy={cancelling}
+          onKeep={() => setBookingToCancel(null)}
+          onConfirm={confirmCancel}
+        />
       )}
 
-      {/* Aviso de cita cancelada, con botón para avisarle al negocio por WhatsApp */}
+      {/* Cita cancelada: fecha tachada, aviso al negocio y botón para apartar otra hora */}
       {cancelledBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
-            <button
-              onClick={() => setCancelledBooking(null)}
-              aria-label="Cerrar"
-              className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
-            >
-              <X size={20} />
-            </button>
-
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center bg-green-500/10 text-green-500">
-                <CheckCircle2 size={32} />
-              </div>
-              <h3 className="text-xl font-bold text-white">Cita cancelada</h3>
-              <p className="text-slate-400">
-                Tu cita del {getDateParts(new Date(cancelledBooking.date)).full} a las {formatTime(cancelledBooking.timeSlot)} ya quedó cancelada. ¿Quieres avisarle al negocio por WhatsApp?
-              </p>
-
-              <a
-                href={buildWhatsAppLink(business, buildCancelMessage(business.name, cancelledBooking))}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => setCancelledBooking(null)}
-                className="w-full bg-green-600 hover:bg-green-700 text-paper py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
-              >
-                <MessageCircle size={20} />
-                Avisar por WhatsApp
-              </a>
-              <button
-                onClick={() => setCancelledBooking(null)}
-                className="w-full py-3 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all"
-              >
-                Ahora no
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto py-6">
+          <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 transform animate-in zoom-in-95 duration-200">
+            <CancelledNotice
+              ticket={cancelledBooking}
+              whatsappHref={buildWhatsAppLink(business, buildCancelMessage(cancelledBooking, business.name))}
+              onRebook={() => navigate(path('/booking'), { state: { prefill: { phone: searchedPhone || '' } } })}
+              onClose={() => setCancelledBooking(null)}
+            />
           </div>
         </div>
       )}
