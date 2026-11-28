@@ -28,6 +28,10 @@ jobs:
         env:
           # En GitHub Pages la página vive en /StyleFlow-Barbershop/ (en un dominio propio sería '/')
           VITE_BASE: /StyleFlow-Barbershop/
+          # Con '#' en la dirección: GitHub Pages no sabe abrir direcciones como /negocio/booking
+          VITE_ROUTER: hash
+          # La dirección raíz abre el negocio de ejemplo (así el enlace de la demo sigue funcionando)
+          VITE_DEFAULT_BUSINESS: demo-barberia
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

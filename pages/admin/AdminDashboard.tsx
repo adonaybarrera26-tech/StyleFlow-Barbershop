@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Booking, Service, ShopSettings } from '../../types';
-import { getBookings, getServices, saveService, deleteService, deleteBooking, getShopSettings, saveShopSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin } from '../../services/dataService';
+import { Booking, Service, BusinessSettings } from '../../types';
+import { getBookings, getServices, saveService, deleteService, deleteBooking, getBusinessSettings, saveBusinessSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin } from '../../services/dataService';
 import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw, MessageCircle } from 'lucide-react';
-import { DEFAULT_SETTINGS, SHOP_INFO } from '../../constants';
+import { DEFAULT_SETTINGS } from '../../constants';
+import { useBusiness } from '../../services/BusinessContext';
 import { formatMXN, formatTime, formatDateTimeShort, getDateParts, escapeHtml, buildCustomerWhatsAppLink } from '../../services/format';
 import AdminSummary from './AdminSummary';
 
 const AdminDashboard: React.FC = () => {
+  const { business, path, url: businessUrl } = useBusiness();
   const [activeTab, setActiveTab] = useState<'summary' | 'bookings' | 'services' | 'settings'>('summary');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [settings, setSettings] = useState<ShopSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<BusinessSettings>(DEFAULT_SETTINGS);
   const [editingService, setEditingService] = useState<Partial<Service> | null>(null);
   const [showTodayOnly, setShowTodayOnly] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -32,10 +34,10 @@ const AdminDashboard: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     const checkAccess = async () => {
-      const isAuth = await isAdminLoggedIn();
+      const isAuth = await isAdminLoggedIn(business);
       if (cancelled) return;
       if (!isAuth) {
-        navigate('/admin/login');
+        navigate(path('/admin/login'));
         return;
       }
       loadData();
@@ -73,9 +75,9 @@ const AdminDashboard: React.FC = () => {
         // Primero limpiar citas antiguas (ayer y antes)
         await cleanupOldBookings();
 
-        const b = await getBookings();
-        const s = await getServices();
-        const config = await getShopSettings();
+        const b = await getBookings(business.id);
+        const s = await getServices(business.id);
+        const config = await getBusinessSettings(business.id);
 
         // Ordenar citas: día ascendente y luego hora ascendente
         const sortedBookings = b.sort((a, b) => {
@@ -105,7 +107,7 @@ const AdminDashboard: React.FC = () => {
   // Si la sesión venció, se regresa al acceso; si no, se muestra un aviso
   const handleActionError = (error: unknown, message: string, silent = false) => {
     if (error instanceof Error && error.message === 'session_expired') {
-      navigate('/admin/login');
+      navigate(path('/admin/login'));
       return;
     }
     if (!silent) setNotification({ type: 'error', message });
@@ -134,7 +136,7 @@ const AdminDashboard: React.FC = () => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Citas");
-    XLSX.writeFile(wb, showTodayOnly ? "StyleFlow_Citas_de_Hoy.xlsx" : "StyleFlow_Todas_las_Citas.xlsx");
+    XLSX.writeFile(wb, showTodayOnly ? `${business.slug}_citas_de_hoy.xlsx` : `${business.slug}_todas_las_citas.xlsx`);
   };
 
   // Función general de impresión (sirve para "Imprimir todas" y "Imprimir día")
@@ -174,7 +176,7 @@ const AdminDashboard: React.FC = () => {
                   </style>
               </head>
               <body>
-                  <h1>${escapeHtml(SHOP_INFO.name)}</h1>
+                  <h1>${escapeHtml(business.name)}</h1>
                   <div class="meta">Reporte de citas: ${escapeHtml(title)}</div>
 
                   ${sortedKeys.map(dateKey => {
@@ -235,7 +237,7 @@ const AdminDashboard: React.FC = () => {
     };
 
     try {
-      await saveService(newService);
+      await saveService(business.id, newService);
       setEditingService(null);
       loadData(true);
       setNotification({ type: 'success', message: 'Servicio guardado correctamente.' });
@@ -251,7 +253,7 @@ const AdminDashboard: React.FC = () => {
   const confirmDeleteService = async () => {
     if (!serviceToDelete) return;
     try {
-      await deleteService(serviceToDelete.id);
+      await deleteService(business.id, serviceToDelete.id);
       setServiceToDelete(null);
       loadData(true);
       setNotification({ type: 'success', message: 'Servicio eliminado correctamente.' });
@@ -266,9 +268,9 @@ const AdminDashboard: React.FC = () => {
     const { weekday, full } = getFormattedDateParts(b.date);
     const firstName = b.customerName.trim().split(/\s+/)[0];
     const services = b.selectedServices.map(s => s.title).join(', ');
-    const site = window.location.href.split('#')[0];
+    const site = businessUrl;
     const message =
-      `Hola ${firstName}, te escribimos de ${SHOP_INFO.name}. ` +
+      `Hola ${firstName}, te escribimos de ${business.name}. ` +
       `Tu cita del ${weekday.toLowerCase()} ${full} a las ${formatTime(b.timeSlot)} (${services}) se canceló. ` +
       `Si quieres reagendar, puedes reservar otra aquí: ${site} ¡Gracias!`;
     return buildCustomerWhatsAppLink(b.customerPhone, message);
@@ -277,7 +279,7 @@ const AdminDashboard: React.FC = () => {
   const confirmDeleteBooking = async () => {
     if (!bookingToDelete) return;
     try {
-      await deleteBooking(bookingToDelete.id);
+      await deleteBooking(business.id, bookingToDelete.id);
       setCancelledBooking(bookingToDelete);
       setBookingToDelete(null);
       loadData(true);
@@ -290,7 +292,7 @@ const AdminDashboard: React.FC = () => {
   const handleSaveSettings = async () => {
     setSavingSettings(true);
     try {
-      await saveShopSettings(settings);
+      await saveBusinessSettings(business.id, settings);
       setNotification({ type: 'success', message: 'Configuración guardada correctamente.' });
     } catch (e) {
       handleActionError(e, 'No se pudo guardar la configuración. Intenta de nuevo.');
@@ -309,8 +311,8 @@ const AdminDashboard: React.FC = () => {
   };
 
   const logout = async () => {
-      await logoutAdmin();
-      navigate('/admin/login');
+      await logoutAdmin(business);
+      navigate(path('/admin/login'));
   }
 
   const getDisplayedBookings = () => {

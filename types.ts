@@ -16,6 +16,24 @@ export interface Promotion {
   promoPrice: number;
 }
 
+// Negocio que usa la app (barbería, spa, consultorio...). Sus datos vienen de la base de datos.
+export interface Business {
+  id: string; // sin base de datos (modo demo) es igual al slug
+  slug: string; // el nombre que va en la dirección: .../<slug>
+  name: string;
+  category: string; // barberia, spa, dentista, nutriologo, medico, estetica, otro
+  tagline: string;
+  whatsappNumber: string; // lada del país + número, solo dígitos (México: 52 + 10 dígitos)
+  displayPhone: string;
+  address: string;
+  mapsUrl: string;
+  instagramUrl: string;
+  facebookUrl: string;
+  tiktokUrl: string;
+  perks: string[];
+  promotions: Promotion[];
+}
+
 export interface Booking {
   id: string;
   customerName: string;
@@ -48,7 +66,7 @@ export interface GeneratedImage {
   prompt: string;
 }
 
-export interface ShopSettings {
+export interface BusinessSettings {
   workStartTime: string; // "10:00"
   workEndTime: string;   // "20:00"
   breakStartTime: string | null; // "13:00" or null

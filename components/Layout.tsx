@@ -1,14 +1,15 @@
 import React from 'react';
-import { Calendar, ClipboardList, Lock, Home, Info, Scissors } from 'lucide-react';
+import { Calendar, ClipboardList, Lock, Home, Info } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '../services/LanguageContext';
-
-// Frases de la cinta superior
-const TICKER_PHRASES = ['Corte fresco', 'Flow real', 'Reserva tu cita', 'Barba al punto'];
+import { useBusiness } from '../services/BusinessContext';
+import { getCategory } from '../services/categories';
 
 const Ticker: React.FC = () => {
-  // El contenido se repite dos veces para que el movimiento no tenga saltos
-  const items = [...TICKER_PHRASES, ...TICKER_PHRASES, ...TICKER_PHRASES, ...TICKER_PHRASES];
+  const { business } = useBusiness();
+  const { ticker, icon: CategoryIcon } = getCategory(business.category);
+  // El contenido se repite varias veces para que el movimiento no tenga saltos
+  const items = [...ticker, ...ticker, ...ticker, ...ticker];
   return (
     <div className="ticker" aria-hidden="true">
       <div className="ticker-track">
@@ -17,7 +18,7 @@ const Ticker: React.FC = () => {
             {items.map((phrase, i) => (
               <React.Fragment key={`${copy}-${i}`}>
                 <span className="ticker-item">{phrase}</span>
-                <Scissors size={14} strokeWidth={3} />
+                <CategoryIcon size={14} strokeWidth={3} />
               </React.Fragment>
             ))}
           </React.Fragment>
@@ -30,8 +31,11 @@ const Ticker: React.FC = () => {
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const { t } = useLanguage();
+  const { business, path } = useBusiness();
 
-  const isCurrent = (path: string) => location.pathname === path;
+  // Se ignora la diagonal final para que ".../barberia/" cuente como ".../barberia"
+  const trimSlash = (value: string) => (value.length > 1 ? value.replace(/\/+$/, '') : value);
+  const isCurrent = (to: string) => trimSlash(location.pathname) === trimSlash(to);
 
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
     const active = isCurrent(to);
@@ -76,7 +80,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Barra superior (celular) */}
         <div className="md:hidden bg-slate-900 p-4 flex justify-center items-center sticky top-0 z-50 border-b-2 border-slate-800">
           <h1 className="text-2xl text-white">
-            <span>{t('heroTitle')}</span>
+            <span>{business.name}</span>
           </h1>
         </div>
 
@@ -84,18 +88,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r-2 border-slate-800 sticky top-0 self-start min-h-screen">
           <div className="p-6 border-b-2 border-slate-800">
             <h1 className="text-3xl leading-none text-white">
-              <span>{t('heroTitle')}</span>
+              <span>{business.name}</span>
             </h1>
           </div>
 
           <nav className="p-4 space-y-2 flex-1">
-            <NavItem to="/" icon={Home} label="Inicio" />
-            <NavItem to="/booking" icon={Calendar} label="Reservar cita" />
-            <NavItem to="/mis-reservas" icon={ClipboardList} label="Mis reservas" />
-            <NavItem to="/about" icon={Info} label={t('aboutUs')} />
+            <NavItem to={path('/')} icon={Home} label="Inicio" />
+            <NavItem to={path('/booking')} icon={Calendar} label="Reservar cita" />
+            <NavItem to={path('/mis-reservas')} icon={ClipboardList} label="Mis reservas" />
+            <NavItem to={path('/about')} icon={Info} label={t('aboutUs')} />
             <div className="pt-4 mt-4 border-t-2 border-slate-800">
                <p className="px-4 text-xs text-slate-500 mb-2">Administración</p>
-               <NavItem to="/admin" icon={Lock} label="Panel de administración" />
+               <NavItem to={path('/admin')} icon={Lock} label="Panel de administración" />
             </div>
           </nav>
 
@@ -119,11 +123,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Navegación inferior (celular) */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t-2 border-slate-800 z-50 h-[70px] pb-safe">
         <div className="flex justify-around items-center h-full px-2">
-          <MobileNavItem to="/" icon={Home} label="Inicio" />
-          <MobileNavItem to="/booking" icon={Calendar} label="Reservar" />
-          <MobileNavItem to="/mis-reservas" icon={ClipboardList} label="Mis citas" />
-          <MobileNavItem to="/about" icon={Info} label="Info" />
-          <MobileNavItem to="/admin" icon={Lock} label="Admin" />
+          <MobileNavItem to={path('/')} icon={Home} label="Inicio" />
+          <MobileNavItem to={path('/booking')} icon={Calendar} label="Reservar" />
+          <MobileNavItem to={path('/mis-reservas')} icon={ClipboardList} label="Mis citas" />
+          <MobileNavItem to={path('/about')} icon={Info} label="Info" />
+          <MobileNavItem to={path('/admin')} icon={Lock} label="Admin" />
         </div>
       </nav>
     </div>

@@ -1,34 +1,52 @@
-import { Promotion, Service, ShopSettings } from './types';
+import { Business, BusinessSettings, Service } from './types';
 
 // ============================================================
-// DATOS DEL NEGOCIO — cambia aquí lo que quieras personalizar
+// NEGOCIO DE EJEMPLO (modo demo, sin base de datos)
 // ============================================================
-export const SHOP_INFO = {
+// Con base de datos (Supabase) cada negocio vive en la tabla "businesses"
+// (ver supabase/schema.sql y el README) y estos datos NO se usan.
+// Sin base de datos, la app muestra solo este negocio de ejemplo.
+export const DEMO_BUSINESS: Business = {
+  id: 'demo-barberia',
+  slug: 'demo-barberia',
   name: 'StyleFlow Barbería',
+  category: 'barberia',
   tagline: 'Corte fresco, flow real. Reserva tu cita en menos de un minuto.',
   // WhatsApp: lada del país + número, solo dígitos y sin espacios.
-  // México: 52 + 10 dígitos. (Número de prueba: cámbialo por el de la barbería)
+  // México: 52 + 10 dígitos. (Número de prueba)
   whatsappNumber: '525617527272',
   displayPhone: '56 1752 7272',
-  // Dirección de ejemplo: cámbiala por la real
+  // Dirección de ejemplo
   address: 'Calle Ejemplo 123, Col. Centro, Ciudad de México',
-  // Redes sociales de ejemplo (llevan a la página principal de cada red): pon el link de la barbería.
-  // Si dejas una en blanco ('') su botón no aparece en la portada.
+  // Link de Google Maps. En blanco, el botón "Cómo llegar" busca la dirección de arriba.
+  mapsUrl: '',
+  // Redes sociales de ejemplo (llevan a la página principal de cada red).
+  // Si una queda en blanco ('') su botón no aparece en la portada.
   instagramUrl: 'https://www.instagram.com/',
   facebookUrl: 'https://www.facebook.com/',
   tiktokUrl: 'https://www.tiktok.com/',
-  // Link de Google Maps. En blanco, el botón "Cómo llegar" busca la dirección de arriba.
-  mapsUrl: '',
-  // Detalles que se muestran como etiquetas en la portada (déjalo vacío para ocultarlas)
+  // Detalles que se muestran como etiquetas en la portada (vacío = se ocultan)
   perks: ['Cafecito de cortesía', 'Música a tu gusto', 'Toalla caliente en la barba'],
+  // Promociones de la portada. Son informativas: el cliente las pide por WhatsApp
+  // (el precio de la reserva en línea sigue siendo el normal). Vacío = se ocultan.
+  promotions: [
+    { id: 'lunes-corte', title: 'Lunes de corte', description: 'Corte de cabello con máquina y tijera', days: 'Solo los lunes', normalPrice: 150, promoPrice: 120 },
+    { id: 'martes-barba', title: 'Martes de barbones', description: 'Corte de cabello y arreglo de barba', days: 'Solo los martes', normalPrice: 250, promoPrice: 210 },
+  ],
 };
 
-// Promociones de ejemplo de la portada. Son informativas: el cliente las pide por WhatsApp
-// (el precio de la reserva en línea sigue siendo el normal). Deja la lista vacía para ocultarlas.
-export const PROMOTIONS: Promotion[] = [
-  { id: 'lunes-corte', title: 'Lunes de corte', description: 'Corte de cabello con máquina y tijera', days: 'Solo los lunes', normalPrice: 150, promoPrice: 120 },
-  { id: 'martes-barba', title: 'Martes de barbones', description: 'Corte de cabello y arreglo de barba', days: 'Solo los martes', normalPrice: 250, promoPrice: 210 },
-];
+// Quién ofrece el servicio: se ve al pie de la pantalla "Acerca de". Deja el nombre en blanco ('') para ocultarlo.
+export const PLATFORM = {
+  name: 'Balam Logic',
+  url: 'https://balamlogic.com',
+};
+
+// Cómo se abre el sitio (se definen al publicar, con variables VITE_*):
+//  - VITE_DEFAULT_BUSINESS: si se abre la raíz del sitio sin nombre de negocio, se manda a este negocio.
+//    En blanco, se muestra una portada general.
+//  - VITE_ROUTER=hash: direcciones con # (para GitHub Pages). Con un dominio propio, direcciones limpias.
+export const DEFAULT_BUSINESS_SLUG: string = import.meta.env.VITE_DEFAULT_BUSINESS || '';
+export const USE_HASH_ROUTER: boolean = import.meta.env.VITE_ROUTER === 'hash';
 
 // Acceso al panel de administración (solo para demostración).
 // Nota: al ser una app sin servidor, esta contraseña viaja en el código de la página.
@@ -45,7 +63,7 @@ export const INITIAL_SERVICES: Service[] = [
   { id: '4', title: 'Limpieza facial', price: 250, durationMinutes: 45, description: 'Mascarilla negra y vapor caliente' },
 ];
 
-export const DEFAULT_SETTINGS: ShopSettings = {
+export const DEFAULT_SETTINGS: BusinessSettings = {
   workStartTime: '10:00',
   workEndTime: '20:00',
   breakStartTime: null,

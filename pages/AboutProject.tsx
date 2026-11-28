@@ -1,10 +1,15 @@
 import React from 'react';
 import { MessageCircle, MapPin, CalendarCheck, Phone } from 'lucide-react';
 import { motion } from 'motion/react';
-import { SHOP_INFO } from '../constants';
-import { buildWhatsAppLink } from '../services/format';
+import { PLATFORM } from '../constants';
+import { buildWhatsAppLink, buildMapsLink } from '../services/format';
+import { useBusiness } from '../services/BusinessContext';
 
 const AboutProject: React.FC = () => {
+  const { business } = useBusiness();
+  // La tarjeta de contacto solo se muestra si el negocio capturó dirección o teléfono
+  const hasContact = Boolean(business.address || business.displayPhone);
+
   return (
     <div className="max-w-4xl mx-auto space-y-12 py-8 px-4">
       <motion.div
@@ -12,9 +17,9 @@ const AboutProject: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="text-center space-y-4"
       >
-        <h1 className="text-4xl font-black text-white">{SHOP_INFO.name}</h1>
+        <h1 className="text-4xl font-black text-white">{business.name}</h1>
         <p className="text-amber-500 font-bold tracking-widest text-xs uppercase bg-amber-500/10 px-4 py-1 rounded-full inline-block">
-          Sistema de citas en línea
+          Citas en línea
         </p>
       </motion.div>
 
@@ -27,20 +32,20 @@ const AboutProject: React.FC = () => {
         >
           <div className="flex items-center gap-4 text-white">
             <CalendarCheck className="text-amber-500" />
-            <h2 className="text-xl font-bold">¿Cómo funciona?</h2>
+            <h2 className="text-xl font-bold">¿Cómo reservar?</h2>
           </div>
           <p className="text-slate-400 leading-relaxed">
-            Tus clientes reservan desde el celular en tres pasos: eligen su servicio, su fecha y su hora. Tú ves y administras todas las citas desde el panel.
+            Reserva desde tu celular en tres pasos: elige tu servicio, tu fecha y tu hora.
           </p>
           <ul className="space-y-3 text-sm text-slate-300">
             <li className="flex items-center gap-2">✓ Reservas en línea las 24 horas</li>
-            <li className="flex items-center gap-2">✓ Panel para administrar citas y servicios</li>
+            <li className="flex items-center gap-2">✓ Ve y cancela tus citas en “Mis reservas”</li>
+            <li className="flex items-center gap-2">✓ Aviso al negocio por WhatsApp con un toque</li>
             <li className="flex items-center gap-2">✓ Precios en pesos mexicanos</li>
-            <li className="flex items-center gap-2">✓ Confirmación por WhatsApp</li>
-            <li className="flex items-center gap-2">✓ Exporta tus citas a Excel o imprímelas</li>
           </ul>
         </motion.div>
 
+        {hasContact && (
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -52,16 +57,28 @@ const AboutProject: React.FC = () => {
             <h2 className="text-xl font-bold">Ubicación y contacto</h2>
           </div>
           <div className="space-y-4 text-slate-300">
-            <div className="flex items-start gap-3">
-              <MapPin size={18} className="text-amber-500 mt-0.5 shrink-0" />
-              <span className="text-sm leading-relaxed">{SHOP_INFO.address}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Phone size={18} className="text-amber-500 shrink-0" />
-              <span className="text-sm">{SHOP_INFO.displayPhone}</span>
-            </div>
+            {business.address && (
+              <div className="flex items-start gap-3">
+                <MapPin size={18} className="text-amber-500 mt-0.5 shrink-0" />
+                <a
+                  href={buildMapsLink(business)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm leading-relaxed underline-offset-4 hover:underline"
+                >
+                  {business.address}
+                </a>
+              </div>
+            )}
+            {business.displayPhone && (
+              <div className="flex items-center gap-3">
+                <Phone size={18} className="text-amber-500 shrink-0" />
+                <span className="text-sm">{business.displayPhone}</span>
+              </div>
+            )}
           </div>
         </motion.div>
+        )}
       </div>
 
       <motion.div
@@ -72,7 +89,7 @@ const AboutProject: React.FC = () => {
       >
         <h2 className="text-2xl font-bold text-white">¿Tienes dudas?</h2>
         <a
-          href={buildWhatsAppLink('Hola, me gustaría tener más información sobre sus servicios.')}
+          href={buildWhatsAppLink(business, 'Hola, me gustaría tener más información sobre sus servicios.')}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold transition-colors shadow-lg shadow-green-900/20"
@@ -82,13 +99,23 @@ const AboutProject: React.FC = () => {
         </a>
       </motion.div>
 
-      <p className="text-center text-xs text-slate-600">
-        Basado en{' '}
-        <a href="https://github.com/erpycode/StyleFlow-Barbershop" target="_blank" rel="noreferrer" className="underline hover:text-slate-400">
-          StyleFlow Barbershop
-        </a>{' '}
-        de ErPyCode · Licencia MIT
-      </p>
+      <div className="text-center text-xs text-slate-600 space-y-1">
+        {PLATFORM.name && (
+          <p>
+            Web app de citas por{' '}
+            <a href={PLATFORM.url} target="_blank" rel="noreferrer" className="underline hover:text-slate-400">
+              {PLATFORM.name}
+            </a>
+          </p>
+        )}
+        <p>
+          Basado en{' '}
+          <a href="https://github.com/erpycode/StyleFlow-Barbershop" target="_blank" rel="noreferrer" className="underline hover:text-slate-400">
+            StyleFlow Barbershop
+          </a>{' '}
+          de ErPyCode · Licencia MIT
+        </p>
+      </div>
     </div>
   );
 };

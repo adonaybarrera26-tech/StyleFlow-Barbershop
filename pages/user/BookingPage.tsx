@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Service, Booking, ShopSettings } from '../../types';
-import { getServices, createBooking, getTakenSlots, getShopSettings } from '../../services/dataService';
+import { Service, Booking, BusinessSettings } from '../../types';
+import { getServices, createBooking, getTakenSlots, getBusinessSettings } from '../../services/dataService';
+import { useBusiness } from '../../services/BusinessContext';
 import { DEFAULT_SETTINGS } from '../../constants';
 import { formatMXN, formatDateLong, formatDateShort, formatTime, isValidMexicanPhone } from '../../services/format';
 import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, Loader2 } from 'lucide-react';
 
 const BookingPage: React.FC = () => {
   const navigate = useNavigate();
+  const { business, path } = useBusiness();
   const [step, setStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
@@ -21,7 +23,7 @@ const BookingPage: React.FC = () => {
   // Horarios disponibles y configuración
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
-  const [shopSettings, setShopSettings] = useState<ShopSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<BusinessSettings>(DEFAULT_SETTINGS);
   const [loadingData, setLoadingData] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [isDayOff, setIsDayOff] = useState(false);
@@ -32,13 +34,13 @@ const BookingPage: React.FC = () => {
       try {
           // Solo se piden los horarios ocupados (sin nombres ni celulares de otros clientes)
           const [fetchedServices, fetchedBookings, fetchedSettings] = await Promise.all([
-              getServices(),
-              getTakenSlots(),
-              getShopSettings()
+              getServices(business.id),
+              getTakenSlots(business.id),
+              getBusinessSettings(business.id)
           ]);
           setServices(fetchedServices);
           setAllBookings(fetchedBookings);
-          setShopSettings(fetchedSettings);
+          setSettings(fetchedSettings);
       } catch (error) {
           console.error("Error al cargar los datos iniciales", error);
           setLoadError(true);
@@ -51,8 +53,8 @@ const BookingPage: React.FC = () => {
     initData();
   }, []);
 
-  // Genera los horarios según la configuración de la barbería
-  const generateTimeSlots = (settings: ShopSettings) => {
+  // Genera los horarios según la configuración del negocio
+  const generateTimeSlots = (settings: BusinessSettings) => {
       const slots: string[] = [];
       const [startH, startM] = settings.workStartTime.split(':').map(Number);
       const [endH, endM] = settings.workEndTime.split(':').map(Number);
@@ -106,7 +108,7 @@ const BookingPage: React.FC = () => {
     const dayOfWeek = selectedDate.getDay(); // 0 (domingo) a 6 (sábado)
 
     // ¿Es día de descanso?
-    if (shopSettings.offDays.includes(dayOfWeek)) {
+    if (settings.offDays.includes(dayOfWeek)) {
         setIsDayOff(true);
         setAvailableSlots([]);
         setSelectedTime('');
@@ -116,7 +118,7 @@ const BookingPage: React.FC = () => {
     }
 
     // Horarios base
-    const slots = generateTimeSlots(shopSettings);
+    const slots = generateTimeSlots(settings);
 
     // "HH:MM" a minutos desde la medianoche
     const toMinutes = (time: string) => {
@@ -137,14 +139,14 @@ const BookingPage: React.FC = () => {
     // no debe caber en un hueco de 30 minutos.
     const neededMinutes = Math.max(
         selectedServices.reduce((sum, s) => sum + s.durationMinutes, 0),
-        shopSettings.slotInterval
+        settings.slotInterval
     );
     const isSlotTaken = (slot: string) => {
         const slotStart = toMinutes(slot);
         const slotEnd = slotStart + neededMinutes;
         return dayBookings.some(b => {
             const bookingStart = toMinutes(b.timeSlot);
-            const bookingEnd = bookingStart + (b.totalDuration || shopSettings.slotInterval);
+            const bookingEnd = bookingStart + (b.totalDuration || settings.slotInterval);
             return slotStart < bookingEnd && slotEnd > bookingStart;
         });
     };
@@ -171,7 +173,7 @@ const BookingPage: React.FC = () => {
     if (selectedTime && (!free.includes(selectedTime))) {
         setSelectedTime('');
     }
-  }, [selectedDate, allBookings, selectedTime, shopSettings, loadingData, selectedServices]);
+  }, [selectedDate, allBookings, selectedTime, settings, loadingData, selectedServices]);
 
 
   const toggleService = (service: Service) => {
@@ -197,7 +199,7 @@ const BookingPage: React.FC = () => {
       setFormError('');
       setLoading(true);
       try {
-        await createBooking({
+        await createBooking(business.id, {
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           selectedServices,
@@ -208,7 +210,7 @@ const BookingPage: React.FC = () => {
         });
 
         // Ir a la página de confirmación
-        navigate('/success', {
+        navigate(path('/success'), {
             state: {
                 customerName: customerName.trim(),
                 formattedDate: formatDateLong(selectedDate),
@@ -223,7 +225,7 @@ const BookingPage: React.FC = () => {
         if (code === 'slot_taken' || code === 'past_date' || code === 'day_off' || code === 'invalid_time') {
           // Alguien más tomó ese horario (o ya no está disponible): se actualiza la lista y se vuelve a elegir
           try {
-            setAllBookings(await getTakenSlots());
+            setAllBookings(await getTakenSlots(business.id));
           } catch (refreshError) {
             console.error('No se pudieron actualizar los horarios', refreshError);
           }
@@ -235,7 +237,7 @@ const BookingPage: React.FC = () => {
         } else if (code === 'invalid_name') {
           setFormError('Escribe tu nombre.');
         } else if (code === 'too_many_bookings') {
-          const max = shopSettings.maxBookingsPerPhone;
+          const max = settings.maxBookingsPerPhone;
           setFormError(
             `Ya tienes ${max === 1 ? '1 cita próxima' : `${max} citas próximas`} con este número, que es el máximo. ` +
             'Cancela una en "Mis reservas" o espera a que pase.'
@@ -393,7 +395,7 @@ const BookingPage: React.FC = () => {
                 {isDayOff ? (
                     <div className="p-12 text-center border-2 border-dashed border-red-500/30 rounded-2xl text-red-400 bg-red-500/5 flex flex-col items-center gap-3">
                         <Ban size={32} />
-                        <span className="font-bold text-lg">La barbería está cerrada este día.</span>
+                        <span className="font-bold text-lg">El negocio está cerrado este día.</span>
                         <span className="text-sm text-red-300">Elige otro día, por favor.</span>
                     </div>
                 ) : availableSlots.length === 0 ? (

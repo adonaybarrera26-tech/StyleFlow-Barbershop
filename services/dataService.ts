@@ -1,22 +1,24 @@
-import { Booking, MyBooking, Service, ShopSettings } from '../types';
-import { INITIAL_SERVICES, DEFAULT_SETTINGS, ADMIN_CREDENTIALS } from '../constants';
+import { Booking, Business, BusinessSettings, MyBooking, Promotion, Service } from '../types';
+import { INITIAL_SERVICES, DEFAULT_SETTINGS, ADMIN_CREDENTIALS, DEMO_BUSINESS } from '../constants';
 import { lastTenDigits } from './format';
 import { isSupabaseEnabled, supabaseRequest, signIn, signOut, getAccessToken, checkIsAdmin } from './supabase';
 
 // La app tiene dos modos:
-//  - Con Supabase (en línea): todos los datos se comparten entre todos los celulares.
-//  - Sin Supabase (modo demo): los datos se guardan solo en el navegador de cada persona.
+//  - Con Supabase (en línea): todos los datos se comparten entre todos los celulares
+//    y cada negocio (tabla "businesses") tiene los suyos.
+//  - Sin Supabase (modo demo): solo existe el negocio de ejemplo y sus datos se guardan
+//    en el navegador de cada persona.
+//
+// Casi todas las funciones reciben el id del negocio (businessId). En modo demo ese id
+// es igual al nombre de la dirección (slug) y sirve para separar lo guardado en el navegador.
 
 // ---------------------------------------------------------------
 // Modo demo (LocalStorage)
 // ---------------------------------------------------------------
 
-// Claves de almacenamiento en el navegador
-const STORAGE_KEYS = {
-  SERVICES: 'styleflow_services',
-  BOOKINGS: 'styleflow_bookings',
-  SETTINGS: 'styleflow_settings'
-};
+// Claves de almacenamiento en el navegador (una por negocio)
+const storageKey = (kind: 'services' | 'bookings' | 'settings', businessId: string): string =>
+  `styleflow_${kind}_${businessId}`;
 
 // Función auxiliar para leer de LocalStorage
 const getFromStorage = <T>(key: string, defaultValue: T): T => {
@@ -69,7 +71,7 @@ const mapBooking = (row: any): Booking => ({
   createdAt: row.created_at
 });
 
-const mapSettings = (row: any): ShopSettings => ({
+const mapSettings = (row: any): BusinessSettings => ({
   workStartTime: row.work_start,
   workEndTime: row.work_end,
   breakStartTime: row.break_start,
@@ -77,6 +79,32 @@ const mapSettings = (row: any): ShopSettings => ({
   offDays: row.off_days || [],
   slotInterval: row.slot_interval,
   maxBookingsPerPhone: row.max_bookings_per_phone ?? DEFAULT_SETTINGS.maxBookingsPerPhone
+});
+
+const mapPromotion = (raw: any, index: number): Promotion => ({
+  id: String(raw?.id ?? `promo-${index}`),
+  title: String(raw?.title ?? ''),
+  description: String(raw?.description ?? ''),
+  days: raw?.days ? String(raw.days) : undefined,
+  normalPrice: Number(raw?.normalPrice) || 0,
+  promoPrice: Number(raw?.promoPrice) || 0
+});
+
+const mapBusiness = (row: any): Business => ({
+  id: row.id,
+  slug: row.slug,
+  name: row.name,
+  category: row.category || 'otro',
+  tagline: row.tagline || '',
+  whatsappNumber: row.whatsapp_number || '',
+  displayPhone: row.display_phone || '',
+  address: row.address || '',
+  mapsUrl: row.maps_url || '',
+  instagramUrl: row.instagram_url || '',
+  facebookUrl: row.facebook_url || '',
+  tiktokUrl: row.tiktok_url || '',
+  perks: Array.isArray(row.perks) ? row.perks.map(String) : [],
+  promotions: Array.isArray(row.promotions) ? row.promotions.map(mapPromotion) : []
 });
 
 // Cambios (PATCH / DELETE): si no se modificó ninguna fila, algo falló (por ejemplo, falta de permisos)
@@ -93,15 +121,32 @@ const mutate = async (path: string, method: 'PATCH' | 'DELETE', body?: unknown):
 };
 
 // ---------------------------------------------------------------
+// Negocio
+// ---------------------------------------------------------------
+
+// Busca un negocio por el nombre de su dirección (slug). Regresa null si no existe o está desactivado.
+export const getBusiness = async (slug: string): Promise<Business | null> => {
+  if (isSupabaseEnabled()) {
+    const rows = await supabaseRequest<any[]>(
+      `/rest/v1/businesses?slug=eq.${encodeURIComponent(slug)}&select=*&limit=1`
+    );
+    return rows.length > 0 ? mapBusiness(rows[0]) : null;
+  }
+  return slug === DEMO_BUSINESS.slug ? DEMO_BUSINESS : null;
+};
+
+// ---------------------------------------------------------------
 // Sesión del administrador
 // ---------------------------------------------------------------
 
-// En modo en línea, "usuario" es el correo del administrador
-export const loginAdmin = async (username: string, password: string): Promise<boolean> => {
+const adminFlagKey = (business: Business): string => `isAdmin_${business.slug}`;
+
+// En modo en línea, "usuario" es el correo del administrador y debe ser administrador de ESTE negocio
+export const loginAdmin = async (business: Business, username: string, password: string): Promise<boolean> => {
   if (isSupabaseEnabled()) {
     const ok = await signIn(username.trim(), password);
     if (!ok) return false;
-    if (!(await checkIsAdmin())) {
+    if (!(await checkIsAdmin(business.id))) {
       await signOut();
       return false;
     }
@@ -109,21 +154,22 @@ export const loginAdmin = async (username: string, password: string): Promise<bo
   }
 
   if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-      sessionStorage.setItem('isAdmin', 'true');
-      return true;
+    sessionStorage.setItem(adminFlagKey(business), 'true');
+    return true;
   }
   return false;
 };
 
-export const isAdminLoggedIn = async (): Promise<boolean> => {
+export const isAdminLoggedIn = async (business: Business): Promise<boolean> => {
   if (isSupabaseEnabled()) {
-    return (await getAccessToken()) !== null;
+    if ((await getAccessToken()) === null) return false;
+    return checkIsAdmin(business.id);
   }
-  return Boolean(sessionStorage.getItem('isAdmin'));
+  return Boolean(sessionStorage.getItem(adminFlagKey(business)));
 };
 
-export const logoutAdmin = async (): Promise<void> => {
-  sessionStorage.removeItem('isAdmin');
+export const logoutAdmin = async (business: Business): Promise<void> => {
+  sessionStorage.removeItem(adminFlagKey(business));
   if (isSupabaseEnabled()) {
     await signOut();
   }
@@ -133,15 +179,18 @@ export const logoutAdmin = async (): Promise<void> => {
 // Servicios
 // ---------------------------------------------------------------
 
-export const getServices = async (): Promise<Service[]> => {
+export const getServices = async (businessId: string): Promise<Service[]> => {
   if (isSupabaseEnabled()) {
-    const rows = await supabaseRequest<any[]>('/rest/v1/services?select=*&order=sort_order.asc,created_at.asc');
+    const rows = await supabaseRequest<any[]>(
+      `/rest/v1/services?business_id=eq.${businessId}&select=*&order=sort_order.asc,created_at.asc`
+    );
     return rows.map(mapService);
   }
-  return getFromStorage<Service[]>(STORAGE_KEYS.SERVICES, INITIAL_SERVICES);
+  // Se copia la lista inicial para que agregar o borrar servicios no modifique la original
+  return getFromStorage<Service[]>(storageKey('services', businessId), [...INITIAL_SERVICES]);
 };
 
-export const saveService = async (service: Service): Promise<void> => {
+export const saveService = async (businessId: string, service: Service): Promise<void> => {
   if (isSupabaseEnabled()) {
     const body: Record<string, unknown> = {
       title: service.title,
@@ -151,10 +200,11 @@ export const saveService = async (service: Service): Promise<void> => {
     };
 
     if (isUuid(service.id)) {
-      await mutate(`/rest/v1/services?id=eq.${service.id}`, 'PATCH', body);
+      await mutate(`/rest/v1/services?id=eq.${service.id}&business_id=eq.${businessId}`, 'PATCH', body);
     } else {
       // Servicio nuevo: la base de datos le asigna su id y lo manda al final de la lista
-      const existing = await getServices();
+      const existing = await getServices(businessId);
+      body.business_id = businessId;
       body.sort_order = existing.length + 1;
       await supabaseRequest('/rest/v1/services', {
         method: 'POST',
@@ -166,7 +216,7 @@ export const saveService = async (service: Service): Promise<void> => {
     return;
   }
 
-  const services = await getServices();
+  const services = await getServices(businessId);
   const index = services.findIndex(s => s.id === service.id);
 
   if (index >= 0) {
@@ -175,20 +225,20 @@ export const saveService = async (service: Service): Promise<void> => {
     services.push(service);
   }
 
-  saveToStorage(STORAGE_KEYS.SERVICES, services);
+  saveToStorage(storageKey('services', businessId), services);
 };
 
-export const deleteService = async (id: string): Promise<void> => {
+export const deleteService = async (businessId: string, id: string): Promise<void> => {
   if (isSupabaseEnabled()) {
     if (isUuid(id)) {
-      await mutate(`/rest/v1/services?id=eq.${id}`, 'DELETE');
+      await mutate(`/rest/v1/services?id=eq.${id}&business_id=eq.${businessId}`, 'DELETE');
     }
     return;
   }
 
-  const services = await getServices();
+  const services = await getServices(businessId);
   const filtered = services.filter(s => s.id !== id);
-  saveToStorage(STORAGE_KEYS.SERVICES, filtered);
+  saveToStorage(storageKey('services', businessId), filtered);
 };
 
 // ---------------------------------------------------------------
@@ -196,17 +246,17 @@ export const deleteService = async (id: string): Promise<void> => {
 // ---------------------------------------------------------------
 
 // Todas las citas con datos de clientes (solo para el administrador)
-export const getBookings = async (): Promise<Booking[]> => {
+export const getBookings = async (businessId: string): Promise<Booking[]> => {
   let bookings: Booking[];
 
   if (isSupabaseEnabled()) {
     const rows = await supabaseRequest<any[]>(
-      '/rest/v1/bookings?select=*&order=booking_date.asc,time_slot.asc',
+      `/rest/v1/bookings?business_id=eq.${businessId}&select=*&order=booking_date.asc,time_slot.asc`,
       { asAdmin: true }
     );
     bookings = rows.map(mapBooking);
   } else {
-    bookings = getFromStorage<Booking[]>(STORAGE_KEYS.BOOKINGS, []);
+    bookings = getFromStorage<Booking[]>(storageKey('bookings', businessId), []);
   }
 
   // Ordenar de la más reciente a la más antigua
@@ -214,11 +264,11 @@ export const getBookings = async (): Promise<Booking[]> => {
 };
 
 // Horarios ocupados, SIN nombres ni celulares (para la pantalla de reservas de los clientes)
-export const getTakenSlots = async (): Promise<Booking[]> => {
+export const getTakenSlots = async (businessId: string): Promise<Booking[]> => {
   if (isSupabaseEnabled()) {
     const rows = await supabaseRequest<any[]>('/rest/v1/rpc/get_taken_slots', {
       method: 'POST',
-      body: { p_from: toDateString(new Date()) }
+      body: { p_business: businessId, p_from: toDateString(new Date()) }
     });
     return rows.map(row => ({
       id: '',
@@ -232,15 +282,16 @@ export const getTakenSlots = async (): Promise<Booking[]> => {
       createdAt: ''
     }));
   }
-  return getBookings();
+  return getBookings(businessId);
 };
 
-export const createBooking = async (booking: Omit<Booking, 'id' | 'createdAt'>): Promise<string> => {
+export const createBooking = async (businessId: string, booking: Omit<Booking, 'id' | 'createdAt'>): Promise<string> => {
   if (isSupabaseEnabled()) {
     // El precio y la duración los calcula el servidor a partir de los servicios elegidos
     const id = await supabaseRequest<string>('/rest/v1/rpc/create_booking', {
       method: 'POST',
       body: {
+        p_business: businessId,
         p_name: booking.customerName,
         p_phone: booking.customerPhone,
         p_service_ids: booking.selectedServices.map(s => s.id),
@@ -251,10 +302,10 @@ export const createBooking = async (booking: Omit<Booking, 'id' | 'createdAt'>):
     return id;
   }
 
-  const bookings = await getBookings();
+  const bookings = await getBookings(businessId);
 
   // Límite de citas próximas por celular (igual que en la base de datos)
-  const { maxBookingsPerPhone } = await getShopSettings();
+  const { maxBookingsPerPhone } = await getBusinessSettings(businessId);
   const today = toDateString(new Date());
   const upcoming = bookings.filter(
     b => lastTenDigits(b.customerPhone) === lastTenDigits(booking.customerPhone) && toDateString(new Date(b.date)) >= today
@@ -271,30 +322,30 @@ export const createBooking = async (booking: Omit<Booking, 'id' | 'createdAt'>):
   };
 
   bookings.push(newBooking);
-  saveToStorage(STORAGE_KEYS.BOOKINGS, bookings);
+  saveToStorage(storageKey('bookings', businessId), bookings);
   return id;
 };
 
-export const deleteBooking = async (id: string): Promise<void> => {
+export const deleteBooking = async (businessId: string, id: string): Promise<void> => {
   if (isSupabaseEnabled()) {
-    await mutate(`/rest/v1/bookings?id=eq.${id}`, 'DELETE');
+    await mutate(`/rest/v1/bookings?id=eq.${id}&business_id=eq.${businessId}`, 'DELETE');
     return;
   }
 
-  const bookings = await getBookings();
-  saveToStorage(STORAGE_KEYS.BOOKINGS, bookings.filter(b => b.id !== id));
+  const bookings = await getBookings(businessId);
+  saveToStorage(storageKey('bookings', businessId), bookings.filter(b => b.id !== id));
 };
 
 // ---------------------------------------------------------------
 // Mis reservas (el cliente ve y cancela sus propias citas con su celular)
 // ---------------------------------------------------------------
 
-// Citas de hoy en adelante de un celular. No incluye nombre ni teléfono.
-export const getMyBookings = async (phone: string): Promise<MyBooking[]> => {
+// Citas de hoy en adelante de un celular en este negocio. No incluye nombre ni teléfono.
+export const getMyBookings = async (businessId: string, phone: string): Promise<MyBooking[]> => {
   if (isSupabaseEnabled()) {
     const rows = await supabaseRequest<any[]>('/rest/v1/rpc/get_my_bookings', {
       method: 'POST',
-      body: { p_phone: phone }
+      body: { p_business: businessId, p_phone: phone }
     });
     return rows.map(row => ({
       id: row.id,
@@ -309,7 +360,7 @@ export const getMyBookings = async (phone: string): Promise<MyBooking[]> => {
   // Modo demo: se busca en las citas guardadas en este navegador
   if (lastTenDigits(phone).length < 10) throw new Error('invalid_phone');
   const today = toDateString(new Date());
-  return getFromStorage<Booking[]>(STORAGE_KEYS.BOOKINGS, [])
+  return getFromStorage<Booking[]>(storageKey('bookings', businessId), [])
     .filter(b => lastTenDigits(b.customerPhone) === lastTenDigits(phone) && toDateString(new Date(b.date)) >= today)
     .sort((a, b) => toDateString(new Date(a.date)).localeCompare(toDateString(new Date(b.date))) || a.timeSlot.localeCompare(b.timeSlot))
     .map(b => ({
@@ -324,19 +375,20 @@ export const getMyBookings = async (phone: string): Promise<MyBooking[]> => {
 
 // Cancela una cita propia. Regresa true si se canceló y false si no se pudo
 // (celular distinto, cita ya pasada o ya cancelada).
-export const cancelMyBooking = async (id: string, phone: string): Promise<boolean> => {
+export const cancelMyBooking = async (businessId: string, id: string, phone: string): Promise<boolean> => {
   if (isSupabaseEnabled()) {
     const result = await supabaseRequest<boolean>('/rest/v1/rpc/cancel_my_booking', {
       method: 'POST',
-      body: { p_booking_id: id, p_phone: phone }
+      body: { p_business: businessId, p_booking_id: id, p_phone: phone }
     });
     return result === true;
   }
 
-  const bookings = getFromStorage<Booking[]>(STORAGE_KEYS.BOOKINGS, []);
+  const key = storageKey('bookings', businessId);
+  const bookings = getFromStorage<Booking[]>(key, []);
   const remaining = bookings.filter(b => !(b.id === id && lastTenDigits(b.customerPhone) === lastTenDigits(phone)));
   if (remaining.length === bookings.length) return false;
-  saveToStorage(STORAGE_KEYS.BOOKINGS, remaining);
+  saveToStorage(key, remaining);
   return true;
 };
 
@@ -345,21 +397,21 @@ export const cleanupOldBookings = async (): Promise<void> => {
 };
 
 // ---------------------------------------------------------------
-// Configuración de la barbería
+// Configuración del negocio (horario)
 // ---------------------------------------------------------------
 
-export const getShopSettings = async (): Promise<ShopSettings> => {
+export const getBusinessSettings = async (businessId: string): Promise<BusinessSettings> => {
   if (isSupabaseEnabled()) {
-    const rows = await supabaseRequest<any[]>('/rest/v1/settings?id=eq.1&select=*');
+    const rows = await supabaseRequest<any[]>(`/rest/v1/settings?business_id=eq.${businessId}&select=*`);
     return rows.length > 0 ? mapSettings(rows[0]) : DEFAULT_SETTINGS;
   }
   // Se mezcla con los valores por defecto por si lo guardado es de una versión anterior
-  return { ...DEFAULT_SETTINGS, ...getFromStorage<Partial<ShopSettings>>(STORAGE_KEYS.SETTINGS, {}) };
+  return { ...DEFAULT_SETTINGS, ...getFromStorage<Partial<BusinessSettings>>(storageKey('settings', businessId), {}) };
 };
 
-export const saveShopSettings = async (settings: ShopSettings): Promise<void> => {
+export const saveBusinessSettings = async (businessId: string, settings: BusinessSettings): Promise<void> => {
   if (isSupabaseEnabled()) {
-    await mutate('/rest/v1/settings?id=eq.1', 'PATCH', {
+    await mutate(`/rest/v1/settings?business_id=eq.${businessId}`, 'PATCH', {
       work_start: settings.workStartTime,
       work_end: settings.workEndTime,
       break_start: settings.breakStartTime,
@@ -370,5 +422,5 @@ export const saveShopSettings = async (settings: ShopSettings): Promise<void> =>
     });
     return;
   }
-  saveToStorage(STORAGE_KEYS.SETTINGS, settings);
+  saveToStorage(storageKey('settings', businessId), settings);
 };

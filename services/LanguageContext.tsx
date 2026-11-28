@@ -1,10 +1,7 @@
 import React, { createContext, useContext, useEffect } from 'react';
-import { SHOP_INFO } from '../constants';
 
 // La app está en español (México). Aquí viven los textos generales.
 const translations: Record<string, string> = {
-  heroTitle: SHOP_INFO.name,
-  heroSubtitle: SHOP_INFO.tagline,
   bookNow: 'Reservar cita',
   adminPanel: 'Panel de administración',
   services: 'Nuestros servicios',

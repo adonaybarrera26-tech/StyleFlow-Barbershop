@@ -1,4 +1,4 @@
-import { SHOP_INFO } from '../constants';
+import { Business } from '../types';
 
 const LOCALE = 'es-MX';
 
@@ -57,16 +57,16 @@ export const isValidMexicanPhone = (phone: string): boolean => {
 // Últimos 10 dígitos de un celular: así "55 1234 5678", "+52 55 1234 5678" y "521 55 1234 5678" son el mismo número
 export const lastTenDigits = (phone: string): string => phone.replace(/\D/g, '').slice(-10);
 
-// Enlace para abrir WhatsApp con un mensaje ya escrito
-export const buildWhatsAppLink = (message: string): string =>
-  `https://wa.me/${SHOP_INFO.whatsappNumber}?text=${encodeURIComponent(message)}`;
+// Enlace para abrir el WhatsApp del negocio con un mensaje ya escrito
+export const buildWhatsAppLink = (business: Business, message: string): string =>
+  `https://wa.me/${business.whatsappNumber}?text=${encodeURIComponent(message)}`;
 
-// Enlace para llamar por teléfono a la barbería
-export const buildCallLink = (): string => `tel:+${SHOP_INFO.whatsappNumber}`;
+// Enlace para llamar por teléfono al negocio
+export const buildCallLink = (business: Business): string => `tel:+${business.whatsappNumber}`;
 
-// Enlace de Google Maps: el que se escribió en SHOP_INFO.mapsUrl o, si está en blanco, una búsqueda de la dirección
-export const buildMapsLink = (): string =>
-  SHOP_INFO.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(SHOP_INFO.address)}`;
+// Enlace de Google Maps: el del negocio o, si está en blanco, una búsqueda de su dirección
+export const buildMapsLink = (business: Business): string =>
+  business.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`;
 
 // Celular de un cliente en formato internacional para wa.me (México: 52 + 10 dígitos)
 export const toWhatsAppNumber = (phone: string): string => {

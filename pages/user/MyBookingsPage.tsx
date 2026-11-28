@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Loader2, Calendar, Clock, X, CheckCircle2, MessageCircle, Scissors, AlertTriangle } from 'lucide-react';
+import { Search, Loader2, Calendar, Clock, X, CheckCircle2, MessageCircle, AlertTriangle } from 'lucide-react';
 import { MyBooking } from '../../types';
-import { SHOP_INFO } from '../../constants';
 import { getMyBookings, cancelMyBooking } from '../../services/dataService';
+import { useBusiness } from '../../services/BusinessContext';
+import { getCategory } from '../../services/categories';
 import { buildWhatsAppLink, formatMXN, formatTime, getDateParts, isValidMexicanPhone } from '../../services/format';
 
 const PHONE_ERROR = 'Escribe un número de celular válido de 10 dígitos.';
 
-// Mensaje para avisarle a la barbería que se canceló la cita (no lleva el nombre: el cliente ya escribe desde su WhatsApp)
-const buildCancelMessage = (b: MyBooking): string => {
+// Mensaje para avisarle al negocio que se canceló la cita (no lleva el nombre: el cliente ya escribe desde su WhatsApp)
+const buildCancelMessage = (businessName: string, b: MyBooking): string => {
   const { weekday, full } = getDateParts(new Date(b.date));
   return (
-    `Hola, cancelé mi cita en ${SHOP_INFO.name}:\n` +
+    `Hola, cancelé mi cita en ${businessName}:\n` +
     `• Fecha: ${weekday}, ${full}\n` +
     `• Hora: ${formatTime(b.timeSlot)}\n` +
     `• Servicios: ${b.services.map(s => s.title).join(', ')}\n` +
@@ -21,6 +22,8 @@ const buildCancelMessage = (b: MyBooking): string => {
 };
 
 const MyBookingsPage: React.FC = () => {
+  const { business, path } = useBusiness();
+  const { icon: CategoryIcon } = getCategory(business.category);
   const [phone, setPhone] = useState('');
   // Celular con el que se hizo la última búsqueda (con ese mismo se cancela)
   const [searchedPhone, setSearchedPhone] = useState<string | null>(null);
@@ -40,7 +43,7 @@ const MyBookingsPage: React.FC = () => {
     setError('');
     setLoading(true);
     try {
-      const list = await getMyBookings(phone.trim());
+      const list = await getMyBookings(business.id, phone.trim());
       setBookings(list);
       setSearchedPhone(phone.trim());
     } catch (err) {
@@ -57,7 +60,7 @@ const MyBookingsPage: React.FC = () => {
     const target = bookingToCancel;
     setCancelling(true);
     try {
-      const done = await cancelMyBooking(target.id, searchedPhone);
+      const done = await cancelMyBooking(business.id, target.id, searchedPhone);
       setBookingToCancel(null);
       if (done) {
         setBookings(prev => prev.filter(b => b.id !== target.id));
@@ -65,7 +68,7 @@ const MyBookingsPage: React.FC = () => {
       } else {
         setError('No se pudo cancelar. Puede que la cita ya se haya cancelado o que ya haya pasado.');
         try {
-          setBookings(await getMyBookings(searchedPhone));
+          setBookings(await getMyBookings(business.id, searchedPhone));
         } catch (refreshError) {
           console.error('No se pudo actualizar la lista', refreshError);
         }
@@ -114,10 +117,10 @@ const MyBookingsPage: React.FC = () => {
 
       {searchedPhone !== null && bookings.length === 0 && (
         <div className="bg-slate-900/50 p-8 rounded-2xl border border-slate-800 text-center space-y-4">
-          <Scissors className="mx-auto text-slate-600" size={32} />
+          <CategoryIcon className="mx-auto text-slate-600" size={32} />
           <p className="text-slate-300">No encontramos citas próximas con ese número.</p>
           <Link
-            to="/booking"
+            to={path('/booking')}
             className="sticker inline-block bg-amber-500 text-black px-6 py-3 rounded-xl font-extrabold hover:bg-amber-400"
           >
             Reservar una cita
@@ -208,7 +211,7 @@ const MyBookingsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Aviso de cita cancelada, con botón para avisarle a la barbería por WhatsApp */}
+      {/* Aviso de cita cancelada, con botón para avisarle al negocio por WhatsApp */}
       {cancelledBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
@@ -226,11 +229,11 @@ const MyBookingsPage: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold text-white">Cita cancelada</h3>
               <p className="text-slate-400">
-                Tu cita del {getDateParts(new Date(cancelledBooking.date)).full} a las {formatTime(cancelledBooking.timeSlot)} ya quedó cancelada. ¿Quieres avisarle a la barbería por WhatsApp?
+                Tu cita del {getDateParts(new Date(cancelledBooking.date)).full} a las {formatTime(cancelledBooking.timeSlot)} ya quedó cancelada. ¿Quieres avisarle al negocio por WhatsApp?
               </p>
 
               <a
-                href={buildWhatsAppLink(buildCancelMessage(cancelledBooking))}
+                href={buildWhatsAppLink(business, buildCancelMessage(business.name, cancelledBooking))}
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => setCancelledBooking(null)}
