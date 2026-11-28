@@ -8,10 +8,11 @@ export interface TicketContext {
 }
 
 // "2026-11-27T12:00:00" -> fecha local (sin correrse de día por la zona horaria)
-const ticketDay = (t: MyBooking): Date => {
-  const [y, m, d] = t.date.slice(0, 10).split('-').map(Number);
+const dayFromIso = (date: string): Date => {
+  const [y, m, d] = date.slice(0, 10).split('-').map(Number);
   return new Date(y, m - 1, d);
 };
+const ticketDay = (t: MyBooking): Date => dayFromIso(t.date);
 
 // Inicio y fin de la cita en hora local
 const ticketRange = (t: MyBooking): { start: Date; end: Date } => {
@@ -45,6 +46,29 @@ export const buildConfirmMessage = (t: MyBooking, businessName: string, customer
     `• Hora: ${formatTime(t.timeSlot)}\n` +
     `• Servicios: ${t.services.map(s => s.title).join(', ')}\n` +
     `• Total: ${formatMXN(t.totalPrice)}\n` +
+    `Quedo atento a su confirmación. ¡Gracias!`
+  );
+};
+
+// Mensaje cuando la persona reagenda: dice qué horario tenía y cuál tiene ahora (no "acabo de reservar")
+export const buildRescheduleMessage = (
+  t: MyBooking,
+  businessName: string,
+  previous?: { date: string; timeSlot: string },
+  customerName?: string
+): string => {
+  const when = (date: Date, timeSlot: string) => {
+    const { weekday, full } = getDateParts(date);
+    return `${weekday}, ${full}, ${formatTime(timeSlot)}`;
+  };
+  return (
+    `Hola${customerName ? `, soy ${customerName}` : ''}. Reagendé mi cita en ${businessName}:\n` +
+    (t.folio ? `• Folio: ${t.folio}\n` : '') +
+    (t.locationName ? `• Sucursal: ${t.locationName}\n` : '') +
+    (t.professionalName ? `• Con: ${t.professionalName}\n` : '') +
+    (previous ? `• Antes: ${when(dayFromIso(previous.date), previous.timeSlot)}\n` : '') +
+    `• Ahora: ${when(ticketDay(t), t.timeSlot)}\n` +
+    `• Servicios: ${t.services.map(s => s.title).join(', ')}\n` +
     `Quedo atento a su confirmación. ¡Gracias!`
   );
 };

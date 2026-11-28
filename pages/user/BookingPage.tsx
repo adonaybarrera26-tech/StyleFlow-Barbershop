@@ -381,7 +381,8 @@ const BookingPage: React.FC = () => {
           },
           phone: reschedule.phone,
           customerName: reschedule.customerName,
-          rescheduled: true
+          rescheduled: true,
+          previous: { date: reschedule.ticket.date, timeSlot: reschedule.ticket.timeSlot }
         };
         navigate(path('/success'), { state: ticketState, replace: true });
       } catch (e) {
