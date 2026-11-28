@@ -6,6 +6,16 @@ export interface Service {
   description?: string;
 }
 
+// Promoción que se muestra en la portada (informativa: el cliente la pide por WhatsApp)
+export interface Promotion {
+  id: string;
+  title: string;
+  description: string;
+  days?: string; // "Solo los lunes"
+  normalPrice: number;
+  promoPrice: number;
+}
+
 export interface Booking {
   id: string;
   customerName: string;
