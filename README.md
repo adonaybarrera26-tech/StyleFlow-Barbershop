@@ -10,7 +10,7 @@ La barbería que viene de ejemplo (`demo-barberia`) es solo la demo: el mismo c�
 
 - **Reserva en 3 pasos:** elegir servicios → elegir fecha y hora → confirmar
 - **Varios negocios en una sola app:** cada uno en su dirección (`/<nombre-del-negocio>`), con su nombre, giro, WhatsApp, dirección, redes, etiquetas y promociones, y sin ver los datos de los demás
-- **Giros listos:** barbería, spa, estética, dentista, nutriólogo, médico y "otro". Cada giro cambia el ícono y las frases de la cinta superior, y trae servicios de ejemplo al darlo de alta
+- **Giros listos:** barbería, spa, estética, dentista, nutriólogo, médico y "otro". Cada giro trae su propio look (colores, letra, formas y una ilustración en la portada), sus frases de la cinta superior y servicios de ejemplo al darlo de alta
 - **Confirmación por WhatsApp:** botón que abre WhatsApp con la cita ya escrita
 - **Mis reservas:** el cliente escribe su celular, ve sus próximas citas y puede cancelarlas (con botón para avisar al negocio por WhatsApp). Con Supabase no muestra nombres ni teléfonos de otras personas
 - **Panel de administración por negocio:** citas, servicios, horarios y días de descanso. Cada administrador solo entra al panel de su negocio
@@ -18,7 +18,8 @@ La barbería que viene de ejemplo (`demo-barberia`) es solo la demo: el mismo c�
 - **Límite de citas por celular:** por defecto 3 citas próximas por número, para que nadie bloquee la agenda. Se cambia en el panel, en Configuración → Citas por cliente
 - **Exportar a Excel e imprimir** la agenda del día o de todas las citas
 - **Portada con botones de acción:** llamar, cómo llegar, Instagram, Facebook y TikTok, más etiquetas de detalles y promociones (lo que el negocio no capture, no se muestra)
-- **Diseño oscuro** que funciona bien en celular y en computadora
+- **4 looks listos** que se asignan solos según el giro: *barbería* (oro y negro, cartel de disco), *spa* (ciruela y rosa cuarzo), *clínica* (porcelana y azul agua) y *natural* (avena y verde hoja). Cada negocio puede poner su logo y el color de su marca (ver abajo)
+- **Funciona bien en celular y en computadora**
 
 ## 🏪 Dar de alta un negocio nuevo
 
@@ -42,6 +43,22 @@ Con la base de datos activa (siguiente sección), cada negocio nuevo toma un min
 3. El administrador entra a `.../sereno-spa/admin`, cambia sus servicios y precios, y ajusta el horario.
 4. Para lo demás (teléfono visible, frase de portada, Instagram, Facebook, TikTok, mapa, etiquetas y promociones), abre **Table Editor → businesses** y llena las columnas del negocio.
 
+### Look del negocio: tema, color de marca y logo
+
+Se cambian en **Table Editor → businesses** (todas son opcionales):
+
+| Columna | Qué hace | Ejemplo |
+|---------|----------|---------|
+| `theme` | Look completo. En blanco usa el de su giro (barbería→`barberia`, spa y estética→`spa`, dentista, médico y otro→`clinica`, nutriólogo→`natural`) | `natural` |
+| `brand_color` | Color principal de su marca. La app calcula sola los tonos y cuida que el texto se lea bien | `#1A8F6B` |
+| `logo_url` | Logo junto al nombre: un link `https://...` o un archivo de la carpeta `public/` | `demos/sereno-spa.svg` |
+
+Los looks están en [`services/themes.ts`](./services/themes.ts) y las ilustraciones de portada en [`components/HeroArt.tsx`](./components/HeroArt.tsx).
+
+### Demos para enseñar a clientes
+
+[`supabase/demos.sql`](./supabase/demos.sql) crea tres negocios de ejemplo (spa, dentista y nutriólogo) con sus servicios, horarios, promoción y logo. Cambia el correo del inicio por el tuyo, pégalo en el SQL Editor y ejecútalo (se puede repetir). Quedan en `.../demo-spa`, `.../demo-dentista` y `.../demo-nutriologo`; la barbería de ejemplo es `.../demo-barberia`.
+
 Las direcciones `admin`, `api`, `app` y `assets` están reservadas. Los negocios con `active = false` dejan de mostrarse.
 
 > **Salud (dentistas, nutriólogos, médicos):** la app guarda solo nombre y celular de quien reserva. No captures datos médicos en la app. Pídele al negocio su aviso de privacidad y, si quiere, su cédula profesional para mostrarla en la portada.
@@ -57,7 +74,8 @@ Sin base de datos, el negocio de ejemplo y sus valores iniciales están en [`con
 | Usuario y contraseña del panel en modo demo | `ADMIN_CREDENTIALS` |
 | Servicios y precios iniciales | `INITIAL_SERVICES` |
 | Horario y días de descanso iniciales | `DEFAULT_SETTINGS` |
-| Ícono y frases de la cinta por giro (o un giro nuevo) | [`services/categories.ts`](./services/categories.ts) |
+| Ícono, frases de la cinta, look e ilustración por giro (o un giro nuevo) | [`services/categories.ts`](./services/categories.ts) |
+| Colores, letras y formas de cada look | [`services/themes.ts`](./services/themes.ts) |
 
 > ⚠️ En **modo demo** cada celular guarda sus propias citas y la contraseña del panel es solo una barrera básica. Para un negocio real activa la base de datos en línea.
 

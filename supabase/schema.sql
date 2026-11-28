@@ -52,6 +52,17 @@ create table if not exists public.businesses (
   created_at timestamptz not null default now()
 );
 
+-- Look del negocio (ver services/themes.ts). Los tres son opcionales:
+--   theme: barberia, spa, clinica o natural. En blanco usa el de su giro (category).
+--   brand_color: color principal de su marca, como #1A8F6B. En blanco usa el del tema.
+--   logo_url: link completo (https://...) o archivo de la app (demos/logo.svg).
+alter table public.businesses add column if not exists theme text not null default ''
+  check (theme in ('', 'barberia', 'spa', 'clinica', 'natural'));
+alter table public.businesses add column if not exists brand_color text not null default ''
+  check (brand_color = '' or brand_color ~ '^#[0-9A-Fa-f]{6}$');
+alter table public.businesses add column if not exists logo_url text not null default ''
+  check (logo_url = '' or logo_url ~* '^https://[^ ]+$' or logo_url ~ '^demos/[a-z0-9._-]+$');
+
 -- Negocio de ejemplo (también es donde caen los datos de la versión anterior)
 insert into public.businesses (
   slug, name, category, tagline, whatsapp_number, display_phone, address,

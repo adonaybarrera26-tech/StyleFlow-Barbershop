@@ -27,6 +27,10 @@ export const DEMO_BUSINESS: Business = {
   tiktokUrl: 'https://www.tiktok.com/',
   // Detalles que se muestran como etiquetas en la portada (vacío = se ocultan)
   perks: ['Cafecito de cortesía', 'Música a tu gusto', 'Toalla caliente en la barba'],
+  // Look del negocio. En blanco, usa el tema de su giro y sin logo (ver services/themes.ts)
+  theme: '',
+  brandColor: '',
+  logoUrl: '',
   // Promociones de la portada. Son informativas: el cliente las pide por WhatsApp
   // (el precio de la reserva en línea sigue siendo el normal). Vacío = se ocultan.
   promotions: [

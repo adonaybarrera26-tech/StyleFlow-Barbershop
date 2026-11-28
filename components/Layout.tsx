@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '../services/LanguageContext';
 import { useBusiness } from '../services/BusinessContext';
 import { getCategory } from '../services/categories';
+import { assetUrl } from '../services/themes';
 
 const Ticker: React.FC = () => {
   const { business } = useBusiness();
@@ -36,6 +37,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Se ignora la diagonal final para que ".../barberia/" cuente como ".../barberia"
   const trimSlash = (value: string) => (value.length > 1 ? value.replace(/\/+$/, '') : value);
   const isCurrent = (to: string) => trimSlash(location.pathname) === trimSlash(to);
+
+  // Logo del negocio (si lo tiene) junto a su nombre
+  const Logo = ({ size }: { size: string }) =>
+    business.logoUrl ? (
+      <img src={assetUrl(business.logoUrl)} alt="" className={`${size} shrink-0 rounded-lg object-contain`} />
+    ) : null;
 
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
     const active = isCurrent(to);
@@ -79,7 +86,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <div className="flex-1 flex flex-col md:flex-row">
         {/* Barra superior (celular) */}
         <div className="md:hidden bg-slate-900 p-4 flex justify-center items-center sticky top-0 z-50 border-b-2 border-slate-800">
-          <h1 className="text-2xl text-white">
+          <h1 className="text-2xl text-white flex items-center gap-3">
+            <Logo size="h-9 w-9" />
             <span>{business.name}</span>
           </h1>
         </div>
@@ -87,7 +95,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Menú lateral (computadora) */}
         <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r-2 border-slate-800 sticky top-0 self-start min-h-screen">
           <div className="p-6 border-b-2 border-slate-800">
-            <h1 className="text-3xl leading-none text-white">
+            <h1 className="text-3xl leading-none text-white flex items-center gap-3">
+              <Logo size="h-11 w-11" />
               <span>{business.name}</span>
             </h1>
           </div>

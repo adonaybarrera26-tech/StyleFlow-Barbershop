@@ -4,6 +4,7 @@ import { MessageCircle, ShieldCheck, Phone, MapPin, Instagram, Facebook } from '
 import { useLanguage } from '../services/LanguageContext';
 import { useBusiness } from '../services/BusinessContext';
 import { getCategory } from '../services/categories';
+import HeroArt from '../components/HeroArt';
 import { buildWhatsAppLink, buildCallLink, buildMapsLink, formatMXN } from '../services/format';
 
 // lucide-react no trae el logo de TikTok, así que se dibuja aquí
@@ -33,7 +34,7 @@ interface QuickAction {
 const Home: React.FC = () => {
   const { t } = useLanguage();
   const { business, path } = useBusiness();
-  const { icon: CategoryIcon } = getCategory(business.category);
+  const { icon: CategoryIcon, hero } = getCategory(business.category);
 
   // Botones de acción rápida. Los que el negocio no tiene capturados no se muestran.
   const quickActions: QuickAction[] = [
@@ -46,14 +47,10 @@ const Home: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center text-center py-8 md:py-12">
-      {/* Disco de vinilo con el ícono del giro en la etiqueta */}
-      <div className="vinyl" aria-hidden="true">
-        <div className="vinyl-label">
-          <CategoryIcon size={34} strokeWidth={2.5} color="#0B0A08" style={{ transform: 'translateY(-14px)' }} />
-        </div>
-      </div>
+      {/* Ilustración de la portada: cada giro tiene la suya */}
+      <HeroArt kind={hero} icon={CategoryIcon} category={business.category} />
 
-      <h1 className="mt-14 text-6xl md:text-8xl leading-[0.95] text-white max-w-2xl">
+      <h1 className="mt-14 text-6xl md:text-8xl leading-[var(--h-leading)] text-white max-w-2xl">
         {business.name}
       </h1>
 

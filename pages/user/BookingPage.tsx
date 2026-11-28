@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Service, Booking, BusinessSettings } from '../../types';
 import { getServices, createBooking, getTakenSlots, getBusinessSettings } from '../../services/dataService';
 import { useBusiness } from '../../services/BusinessContext';
+import { getCategory } from '../../services/categories';
 import { DEFAULT_SETTINGS } from '../../constants';
 import { formatMXN, formatDateLong, formatDateShort, formatTime, isValidMexicanPhone } from '../../services/format';
 import { Clock, Calendar as CalendarIcon, ChevronLeft, ChevronRight, User, Ban, Loader2 } from 'lucide-react';
@@ -291,7 +292,7 @@ const BookingPage: React.FC = () => {
                 onClick={() => toggleService(service)}
                 className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
                   isSelected
-                    ? 'border-amber-500 bg-amber-500/10 shadow-[4px_4px_0_0_#F2B705]'
+                    ? 'border-amber-500 bg-amber-500/10 pop-accent'
                     : 'border-slate-800 hover:border-slate-700 bg-slate-900'
                 }`}
               >
@@ -370,7 +371,7 @@ const BookingPage: React.FC = () => {
                                 onClick={() => { setSelectedDate(date); setFormError(''); }}
                                 className={`flex-shrink-0 w-24 h-32 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${
                                     isSelected
-                                    ? 'bg-amber-500 text-black border-amber-500 shadow-[4px_4px_0_0_#F1E8D0] -translate-y-1'
+                                    ? 'bg-amber-500 text-black border-amber-500 pop-ink -translate-y-1'
                                     : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-600 hover:bg-slate-800'
                                 }`}
                              >
@@ -474,6 +475,11 @@ const BookingPage: React.FC = () => {
                     placeholder="55 1234 5678"
                 />
             </div>
+            {getCategory(business.category).health && (
+                <p className="text-xs text-slate-400">
+                    Solo te pedimos tu nombre y celular. Para reservar no necesitas contarnos nada de tu salud.
+                </p>
+            )}
         </div>
 
         <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 space-y-4">

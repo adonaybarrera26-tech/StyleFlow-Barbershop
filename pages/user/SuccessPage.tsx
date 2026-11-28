@@ -78,7 +78,7 @@ const SuccessPage: React.FC = () => {
                 href={buildWhatsAppLink(business, whatsappMessage)}
                 target="_blank"
                 rel="noreferrer"
-                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
+                className="w-full bg-green-600 hover:bg-green-700 text-paper py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
             >
                 <MessageCircle size={20} />
                 Confirmar por WhatsApp
@@ -110,7 +110,7 @@ const SuccessPage: React.FC = () => {
                         href={mapLink}
                         target="_blank"
                         rel="noreferrer"
-                        className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute inset-0 flex items-center justify-center bg-scrim/40 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                         <span className="bg-white text-slate-900 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2">
                             <Navigation size={16} /> Abrir mapa

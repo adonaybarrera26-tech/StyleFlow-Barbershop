@@ -172,7 +172,7 @@ const MyBookingsPage: React.FC = () => {
 
       {/* Ventana para confirmar la cancelación */}
       {bookingToCancel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
             <button
               onClick={() => setBookingToCancel(null)}
@@ -201,7 +201,7 @@ const MyBookingsPage: React.FC = () => {
                 <button
                   onClick={confirmCancel}
                   disabled={cancelling}
-                  className="flex-1 py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-all disabled:opacity-60"
+                  className="flex-1 py-3 rounded-xl font-bold text-paper bg-red-600 hover:bg-red-700 transition-all disabled:opacity-60"
                 >
                   {cancelling ? 'Cancelando...' : 'Sí, cancelar'}
                 </button>
@@ -213,7 +213,7 @@ const MyBookingsPage: React.FC = () => {
 
       {/* Aviso de cita cancelada, con botón para avisarle al negocio por WhatsApp */}
       {cancelledBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-700 p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 relative transform animate-in zoom-in-95 duration-200">
             <button
               onClick={() => setCancelledBooking(null)}
@@ -237,7 +237,7 @@ const MyBookingsPage: React.FC = () => {
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => setCancelledBooking(null)}
-                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
+                className="w-full bg-green-600 hover:bg-green-700 text-paper py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
               >
                 <MessageCircle size={20} />
                 Avisar por WhatsApp
