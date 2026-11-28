@@ -15,6 +15,7 @@ import {
   ticketDateText
 } from '../../services/ticket';
 import { CancelConfirmModal, CancelledNotice } from '../../components/CancelDialogs';
+import StatusChip from '../../components/StatusChip';
 
 const SuccessPage: React.FC = () => {
   const location = useLocation();
@@ -122,6 +123,7 @@ const SuccessPage: React.FC = () => {
             Te esperamos <span className="text-amber-500 font-bold">{relativeDayText(ticket)}</span> a las{' '}
             <span className="text-white font-bold">{formatTime(ticket.timeSlot)}</span>
           </p>
+          <StatusChip status={ticket.status} />
         </div>
 
         {/* Ticket */}

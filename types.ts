@@ -72,6 +72,9 @@ export interface Business {
   logoUrl: string; // logo: link completo (https://...) o archivo de la app (demos/logo.svg)
 }
 
+// Estado de una cita: la confirma el negocio desde el panel
+export type BookingStatus = 'pending' | 'confirmed';
+
 export interface Booking {
   id: string;
   customerName: string;
@@ -87,6 +90,7 @@ export interface Booking {
   folio?: string; // código de 4 letras de la cita (ej. RDRY)
   professionalId?: string | null; // con quién es la cita (vacío = el negocio no tiene profesionales)
   professionalName?: string; // nombre del profesional, para mostrarlo sin buscarlo
+  status?: BookingStatus; // pendiente (por defecto) o confirmada por el negocio
 }
 
 // Cita vista por el propio cliente en "Mis reservas": sin nombre ni teléfono
@@ -105,6 +109,7 @@ export interface MyBooking {
   waiverAccepted?: boolean; // ya aceptó el deslinde al reservar
   professionalId?: string | null; // con quién es la cita
   professionalName?: string;
+  status?: BookingStatus; // pendiente (por defecto) o confirmada por el negocio
 }
 
 // Lo que viaja a la pantalla del ticket (y de ahí a reagendar o cancelar)

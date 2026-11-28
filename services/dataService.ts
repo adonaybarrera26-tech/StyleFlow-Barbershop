@@ -1,4 +1,4 @@
-import { Booking, Business, BusinessLocation, BusinessSettings, MyBooking, Professional, Promotion, Service } from '../types';
+import { Booking, BookingStatus, Business, BusinessLocation, BusinessSettings, MyBooking, Professional, Promotion, Service } from '../types';
 import { INITIAL_SERVICES, DEFAULT_SETTINGS, ADMIN_CREDENTIALS, DEMO_BUSINESS } from '../constants';
 import { lastTenDigits } from './format';
 import { isSupabaseEnabled, supabaseRequest, signIn, signOut, getAccessToken, checkIsAdmin } from './supabase';
@@ -104,7 +104,8 @@ const mapBooking = (row: any): Booking => ({
   locationId: row.location_id ?? null,
   waiverAcceptedAt: row.waiver_accepted_at ?? null,
   folio: row.folio || undefined,
-  professionalId: row.professional_id ?? null
+  professionalId: row.professional_id ?? null,
+  status: row.status === 'confirmed' ? 'confirmed' : 'pending'
 });
 
 const mapSettings = (row: any): BusinessSettings => ({
@@ -395,12 +396,24 @@ export const createBooking = async (
     id,
     createdAt,
     waiverAcceptedAt: waiverAccepted ? createdAt : null,
-    folio
+    folio,
+    status: 'pending'
   };
 
   bookings.push(newBooking);
   saveToStorage(storageKey('bookings', businessId), bookings);
   return { id, folio };
+};
+
+// El negocio confirma una cita (o la regresa a pendiente)
+export const setBookingStatus = async (businessId: string, id: string, status: BookingStatus): Promise<void> => {
+  if (isSupabaseEnabled()) {
+    await mutate(`/rest/v1/bookings?id=eq.${id}&business_id=eq.${businessId}`, 'PATCH', { status });
+    return;
+  }
+
+  const bookings = await getBookings(businessId);
+  saveToStorage(storageKey('bookings', businessId), bookings.map(b => (b.id === id ? { ...b, status } : b)));
 };
 
 export const deleteBooking = async (businessId: string, id: string): Promise<void> => {
@@ -438,7 +451,8 @@ export const getMyBookings = async (businessId: string, phone: string): Promise<
       folio: row.folio || undefined,
       waiverAccepted: row.waiver_accepted === true,
       professionalId: row.professional_id ?? null,
-      professionalName: row.professional_name || undefined
+      professionalName: row.professional_name || undefined,
+      status: row.status === 'confirmed' ? 'confirmed' : 'pending'
     }));
   }
 
@@ -459,7 +473,8 @@ export const getMyBookings = async (businessId: string, phone: string): Promise<
       waiverAccepted: !!b.waiverAcceptedAt,
       locationId: b.locationId ?? null,
       professionalId: b.professionalId ?? null,
-      professionalName: b.professionalName
+      professionalName: b.professionalName,
+      status: b.status === 'confirmed' ? 'confirmed' : 'pending'
     }));
 };
 
@@ -514,7 +529,8 @@ export const rescheduleMyBooking = async (
   if (toDateString(new Date(bookings[index].date)) === toDateString(date) && bookings[index].timeSlot === timeSlot) {
     throw new Error('same_slot');
   }
-  bookings[index] = { ...bookings[index], date: date.toISOString(), timeSlot };
+  // Al cambiar el horario, el negocio tiene que confirmarla otra vez
+  bookings[index] = { ...bookings[index], date: date.toISOString(), timeSlot, status: 'pending' };
   saveToStorage(key, bookings);
   return id;
 };

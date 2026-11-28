@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Booking, BusinessLocation, Professional, Service, BusinessSettings } from '../../types';
-import { getBookings, getServices, getLocations, getProfessionals, saveService, deleteService, deleteBooking, getBusinessSettings, saveBusinessSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin } from '../../services/dataService';
-import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw, MessageCircle, MapPin, User } from 'lucide-react';
+import { Booking, BookingStatus, BusinessLocation, Professional, Service, BusinessSettings } from '../../types';
+import { getBookings, getServices, getLocations, getProfessionals, saveService, deleteService, deleteBooking, getBusinessSettings, saveBusinessSettings, cleanupOldBookings, isAdminLoggedIn, logoutAdmin, setBookingStatus } from '../../services/dataService';
+import { Download, Plus, Trash2, Edit2, Clock, CalendarCheck, Printer, Filter, Settings, Save, CheckCircle2, XCircle, X, RefreshCw, MessageCircle, MapPin, User, Search } from 'lucide-react';
 import { DEFAULT_SETTINGS, DEFAULT_WAIVER_TEXT } from '../../constants';
 import { useBusiness } from '../../services/BusinessContext';
 import { isSupabaseEnabled } from '../../services/supabase';
@@ -11,6 +11,8 @@ import AdminSummary from './AdminSummary';
 import AdminLocations, { WEEK_DAYS } from './AdminLocations';
 import AdminProfessionals from './AdminProfessionals';
 import AdminAccount from './AdminAccount';
+import StatusChip from '../../components/StatusChip';
+import { buildBookingConfirmedMessage } from '../../services/ticket';
 
 const AdminDashboard: React.FC = () => {
   const { business, path, url: businessUrl, refreshLocations } = useBusiness();
@@ -24,6 +26,9 @@ const AdminDashboard: React.FC = () => {
   // Filtros de la lista de citas: '' = todas las sucursales / todos los profesionales
   const [locationFilter, setLocationFilter] = useState('');
   const [proFilter, setProFilter] = useState('');
+  // Buscador (folio, nombre o celular) y filtro de citas que faltan por confirmar
+  const [search, setSearch] = useState('');
+  const [pendingOnly, setPendingOnly] = useState(false);
   const [settings, setSettings] = useState<BusinessSettings>(DEFAULT_SETTINGS);
   const [editingService, setEditingService] = useState<Partial<Service> | null>(null);
   const [showTodayOnly, setShowTodayOnly] = useState(false);
@@ -148,6 +153,7 @@ const AdminDashboard: React.FC = () => {
         'Fecha': full,
         'Hora': formatTime(b.timeSlot),
         'Total (MXN)': b.totalPrice,
+        'Estado': statusText(b),
         'Registrada': formatDateTimeShort(new Date(b.createdAt))
       };
     });
@@ -217,8 +223,9 @@ const AdminDashboard: React.FC = () => {
                                           <th width="18%">Celular</th>
                                           ${locations.length > 0 ? '<th width="15%">Sucursal</th>' : ''}
                                           ${professionals.length > 0 ? '<th width="12%">Con</th>' : ''}
-                                          <th width="22%">Servicios</th>
+                                          <th width="18%">Servicios</th>
                                           <th width="12%">Total (MXN)</th>
+                                          <th width="10%">Estado</th>
                                       </tr>
                                   </thead>
                                   <tbody>
@@ -232,6 +239,7 @@ const AdminDashboard: React.FC = () => {
                                               ${professionals.length > 0 ? `<td>${escapeHtml(proName(b))}</td>` : ''}
                                               <td>${escapeHtml(b.selectedServices.map(s => s.title).join(', '))}</td>
                                               <td>${escapeHtml(formatMXN(b.totalPrice))}</td>
+                                              <td>${escapeHtml(statusText(b))}</td>
                                           </tr>
                                       `).join('')}
                                   </tbody>
@@ -351,9 +359,65 @@ const AdminDashboard: React.FC = () => {
       return professionals.find(p => p.id === b.professionalId)?.name || '';
   }
 
+  // ¿La cita es de hoy en adelante? (las pasadas ya no se confirman)
+  function isUpcoming(b: Booking): boolean {
+      const d = new Date(b.date);
+      const t = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate()) >= new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  }
+
+  // Texto del estado para Excel e impresión ('' en citas que ya pasaron y nunca se confirmaron)
+  function statusText(b: Booking): string {
+      if (b.status === 'confirmed') return 'Confirmada';
+      return isUpcoming(b) ? 'Por confirmar' : '';
+  }
+
+  // ¿La cita coincide con lo escrito en el buscador? Folio, nombre o celular
+  const matchesSearch = (b: Booking): boolean => {
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      const digits = q.replace(/\D/g, '');
+      return (
+          (b.folio || '').toLowerCase().includes(q) ||
+          b.customerName.toLowerCase().includes(q) ||
+          (digits.length >= 3 && b.customerPhone.replace(/\D/g, '').includes(digits))
+      );
+  };
+
+  const needsConfirmation = (b: Booking): boolean => b.status !== 'confirmed' && isUpcoming(b);
+  const pendingCount = bookings.filter(needsConfirmation).length;
+
+  // Mensaje de WhatsApp para el cliente: "tu cita quedó confirmada"
+  const buildConfirmedLink = (b: Booking): string => {
+      const location = locations.find(l => l.id === b.locationId);
+      return buildCustomerWhatsAppLink(
+          b.customerPhone,
+          buildBookingConfirmedMessage(b, {
+              businessName: business.name,
+              siteUrl: businessUrl,
+              locationName: location?.name,
+              locationAddress: location?.address,
+              professionalName: proName(b) || undefined
+          })
+      );
+  };
+
+  // Cambia el estado de una cita (se ve al instante; si no se pudo guardar, regresa como estaba)
+  const changeStatus = async (b: Booking, status: BookingStatus) => {
+      const previous = b.status;
+      setBookings(list => list.map(x => (x.id === b.id ? { ...x, status } : x)));
+      try {
+          await setBookingStatus(business.id, b.id, status);
+      } catch (e) {
+          setBookings(list => list.map(x => (x.id === b.id ? { ...x, status: previous } : x)));
+          handleActionError(e, 'No se pudo guardar el estado de la cita. Intenta de nuevo.');
+      }
+  };
+
   const getDisplayedBookings = () => {
       const inLocation = (b: Booking) =>
-          (!locationFilter || b.locationId === locationFilter) && (!proFilter || b.professionalId === proFilter);
+          (!locationFilter || b.locationId === locationFilter) && (!proFilter || b.professionalId === proFilter) &&
+          matchesSearch(b) && (!pendingOnly || needsConfirmation(b));
       if (showTodayOnly) {
           const today = new Date();
           const todayVal = today.getFullYear() * 10000 + today.getMonth() * 100 + today.getDate();
@@ -615,6 +679,29 @@ const AdminDashboard: React.FC = () => {
           {/* Barra de acciones */}
           <div className="flex flex-col xl:flex-row gap-4 justify-between bg-slate-900 p-4 rounded-xl border border-slate-800">
               <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+                      <input
+                          type="search"
+                          value={search}
+                          onChange={e => setSearch(e.target.value)}
+                          placeholder="Buscar folio, nombre o celular"
+                          aria-label="Buscar citas por folio, nombre o celular"
+                          className="bg-slate-800 text-slate-200 placeholder:text-slate-500 pl-9 pr-3 py-2 rounded-lg border border-slate-700 outline-none focus:border-amber-500 w-full sm:w-64"
+                      />
+                  </div>
+
+                  <button
+                      onClick={() => setPendingOnly(!pendingOnly)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                          pendingOnly
+                          ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/20 ring-2 ring-amber-500 ring-offset-2 ring-offset-slate-900'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                  >
+                      Por confirmar ({pendingCount})
+                  </button>
+
                   <button
                       onClick={() => setShowTodayOnly(!showTodayOnly)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
@@ -775,6 +862,40 @@ const AdminDashboard: React.FC = () => {
                                         {proName(booking) && (
                                             <div className="text-slate-300 text-xs mt-1 flex items-center gap-1">
                                                 <User size={12} aria-hidden="true" /> Con {proName(booking)}
+                                            </div>
+                                        )}
+                                        {isUpcoming(booking) && (
+                                            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                                                <StatusChip status={booking.status} />
+                                                {booking.status === 'confirmed' ? (
+                                                    <>
+                                                        <a
+                                                            href={buildConfirmedLink(booking)}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="text-xs text-slate-300 underline underline-offset-2 hover:text-white"
+                                                        >
+                                                            Avisar otra vez
+                                                        </a>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => changeStatus(booking, 'pending')}
+                                                            className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-300"
+                                                        >
+                                                            Deshacer
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <a
+                                                        href={buildConfirmedLink(booking)}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        onClick={() => changeStatus(booking, 'confirmed')}
+                                                        className="inline-flex items-center gap-1.5 whitespace-nowrap bg-green-600 hover:bg-green-700 text-paper text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                                                    >
+                                                        <MessageCircle size={14} aria-hidden="true" /> Confirmar y avisar
+                                                    </a>
+                                                )}
                                             </div>
                                         )}
                                     </td>
