@@ -41,7 +41,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Logo del negocio (si lo tiene) junto a su nombre
   const Logo = ({ size }: { size: string }) =>
     business.logoUrl ? (
-      <img src={assetUrl(business.logoUrl)} alt="" className={`${size} shrink-0 rounded-lg object-contain`} />
+      <img src={assetUrl(business.logoUrl)} alt="" className={`brand-logo ${size} shrink-0 object-cover`} />
     ) : null;
 
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => {
@@ -80,12 +80,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col font-sans">
+    <div className="min-h-screen text-slate-200 flex flex-col font-sans">
       <Ticker />
 
       <div className="flex-1 flex flex-col md:flex-row">
         {/* Barra superior (celular) */}
-        <div className="md:hidden bg-slate-900 p-4 flex justify-center items-center sticky top-0 z-50 border-b-2 border-slate-800">
+        <div className="glass-bar md:hidden bg-slate-900 p-4 flex justify-center items-center sticky top-0 z-50 border-b-2 border-slate-800">
           <h1 className="text-2xl text-white flex items-center gap-3">
             <Logo size="h-9 w-9" />
             <span>{business.name}</span>
@@ -93,7 +93,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
 
         {/* Menú lateral (computadora) */}
-        <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r-2 border-slate-800 sticky top-0 self-start min-h-screen">
+        <aside className="glass-bar hidden md:flex flex-col w-64 bg-slate-900 border-r-2 border-slate-800 sticky top-0 self-start min-h-screen">
           <div className="p-6 border-b-2 border-slate-800">
             <h1 className="text-3xl leading-none text-white flex items-center gap-3">
               <Logo size="h-11 w-11" />
@@ -122,7 +122,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </aside>
 
         {/* Contenido principal */}
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-950 pb-24 md:pb-8">
+        <main className="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-8">
           <div className="max-w-4xl mx-auto">
             {children}
           </div>
@@ -130,7 +130,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
 
       {/* Navegación inferior (celular) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t-2 border-slate-800 z-50 h-[70px] pb-safe">
+      <nav className="glass-bar md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t-2 border-slate-800 z-50 h-[70px] pb-safe">
         <div className="flex justify-around items-center h-full px-2">
           <MobileNavItem to={path('/')} icon={Home} label="Inicio" />
           <MobileNavItem to={path('/booking')} icon={Calendar} label="Reservar" />

@@ -53,11 +53,13 @@ create table if not exists public.businesses (
 );
 
 -- Look del negocio (ver services/themes.ts). Los tres son opcionales:
---   theme: barberia, spa, clinica o natural. En blanco usa el de su giro (category).
+--   theme: barberia, spa, clinica, natural o esencia. En blanco usa el de su giro (category).
 --   brand_color: color principal de su marca, como #1A8F6B. En blanco usa el del tema.
 --   logo_url: link completo (https://...) o archivo de la app (demos/logo.svg).
-alter table public.businesses add column if not exists theme text not null default ''
-  check (theme in ('', 'barberia', 'spa', 'clinica', 'natural'));
+alter table public.businesses add column if not exists theme text not null default '';
+alter table public.businesses drop constraint if exists businesses_theme_check;
+alter table public.businesses add constraint businesses_theme_check
+  check (theme in ('', 'barberia', 'spa', 'clinica', 'natural', 'esencia'));
 alter table public.businesses add column if not exists brand_color text not null default ''
   check (brand_color = '' or brand_color ~ '^#[0-9A-Fa-f]{6}$');
 alter table public.businesses add column if not exists logo_url text not null default ''
@@ -747,6 +749,8 @@ begin
       '[{"t":"Consulta general","p":500,"d":30,"x":"Revisión y diagnóstico"},{"t":"Consulta de seguimiento","p":350,"d":20,"x":"Control y resultados"}]'
     when 'estetica' then
       '[{"t":"Corte de cabello","p":250,"d":45,"x":"Corte y peinado"},{"t":"Manicure","p":200,"d":45,"x":"Cuidado y esmaltado"},{"t":"Tinte","p":800,"d":120,"x":"Color completo"}]'
+    when 'estudio' then
+      '[{"t":"Clase grupal","p":150,"d":60,"x":"Cupo limitado, cada quien con su lugar"},{"t":"Clase privada","p":300,"d":60,"x":"Atención 1 a 1 a tu ritmo"}]'
     else
       '[{"t":"Consulta o servicio","p":300,"d":30,"x":"Edita este servicio desde tu panel"}]'
   end::jsonb;

@@ -1,5 +1,5 @@
 -- =====================================================================
--- NEGOCIOS DE EJEMPLO para mostrar a clientes: spa, dentista y nutriólogo
+-- NEGOCIOS DE EJEMPLO para mostrar a clientes: spa, dentista, nutriólogo y estudio de pole
 -- =====================================================================
 -- Pegar completo en Supabase > SQL Editor y ejecutar (se puede repetir las veces que quieras:
 -- deja cada demo como nuevo). Antes, cambia el correo de la línea "v_admin" por el tuyo:
@@ -8,6 +8,7 @@
 --   app.tudominio.com/demo-spa          (tema "spa": ciruela y rosa cuarzo)
 --   app.tudominio.com/demo-dentista     (tema "clinica": porcelana y azul agua)
 --   app.tudominio.com/demo-nutriologo   (tema "natural": avena y verde hoja)
+--   app.tudominio.com/demo-pole         (tema "esencia": noche violeta y dorado)
 --
 -- Los datos son inventados (teléfono de prueba, direcciones de ejemplo). Los logos están en public/demos/.
 -- Requiere haber ejecutado antes supabase/schema.sql.
@@ -125,6 +126,45 @@ begin
     {"t":"Consulta deportiva","p":850,"d":60,"x":"Plan para rendimiento y composición corporal"},
     {"t":"Consulta en línea","p":450,"d":40,"x":"Por videollamada, desde donde estés"},
     {"t":"Composición corporal","p":350,"d":20,"x":"Medición de grasa y músculo"}
+  ]'::jsonb) with ordinality as e(x, n);
+
+  insert into public.admins (business_id, email)
+  select v_id, lower(trim(v_admin))
+  where not exists (select 1 from public.admins where business_id = v_id and email = lower(trim(v_admin)));
+
+  -- ---------------------------------------------------------------- Pole Essence (estudio)
+  select id into v_id from public.businesses where slug = 'demo-pole';
+  if v_id is null then
+    v_id := public.create_business('demo-pole', 'Pole Essence', 'estudio', '5617527272', v_admin, 'Calle Ejemplo 12, Huixquilucan, Estado de México');
+  end if;
+
+  update public.businesses set
+    name = 'Pole Essence',
+    category = 'estudio',
+    tagline = 'Pole dance y fitness para descubrir tu fuerza. Clases grupales, semi personalizadas y privadas.',
+    instagram_url = 'https://www.instagram.com/',
+    facebook_url = 'https://www.facebook.com/',
+    tiktok_url = 'https://www.tiktok.com/',
+    perks = array['Máximo 6 alumnas', 'Cada alumna con su tubo', 'Sin experiencia previa'],
+    promotions = '[{"id":"paquete-semi","title":"Paquete de 4 semi personalizadas","description":"Cuatro clases para 2 alumnas, con atención casi privada","days":"Favorito de las alumnas","normalPrice":480,"promoPrice":450}]'::jsonb,
+    theme = '', brand_color = '', logo_url = 'demos/pole-essence.webp'
+  where id = v_id;
+
+  update public.settings set
+    work_start = '09:00', work_end = '21:00', break_start = '14:00', break_end = '17:00',
+    off_days = '{0}', slot_interval = 60
+  where business_id = v_id;
+
+  delete from public.services where business_id = v_id;
+  insert into public.services (business_id, title, price, duration_minutes, description, sort_order)
+  select v_id, e.x ->> 't', (e.x ->> 'p')::integer, (e.x ->> 'd')::integer, e.x ->> 'x', e.n::integer
+  from jsonb_array_elements('[
+    {"t":"Pole Básico","p":120,"d":60,"x":"Tu primer encuentro con el tubo, sin experiencia previa"},
+    {"t":"Pole Intermedio","p":120,"d":60,"x":"Fluidez, fuerza y primeras inversiones"},
+    {"t":"Pole Avanzado","p":120,"d":60,"x":"Figuras aéreas y transiciones de alto nivel"},
+    {"t":"Pole Exotic","p":120,"d":60,"x":"Sensualidad, floorwork y tacones"},
+    {"t":"Semi personalizada","p":120,"d":60,"x":"2 alumnas, cada quien con su tubo"},
+    {"t":"Clase privada 1 a 1","p":200,"d":60,"x":"Plan a tu medida y atención exclusiva"}
   ]'::jsonb) with ordinality as e(x, n);
 
   insert into public.admins (business_id, email)

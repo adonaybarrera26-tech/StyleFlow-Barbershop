@@ -61,6 +61,13 @@ export const CATEGORIES: Record<string, CategoryPreset> = {
     hero: 'ripple',
     health: true,
   },
+  estudio: {
+    label: 'Estudio de pole, yoga o baile',
+    icon: Sparkles,
+    ticker: ['Descubre tu esencia', 'Fuerza y gracia', 'Reserva tu clase', 'Cupo limitado'],
+    theme: 'esencia',
+    hero: 'logo',
+  },
   otro: {
     label: 'Servicios',
     icon: CalendarCheck,

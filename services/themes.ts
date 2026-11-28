@@ -11,8 +11,8 @@ import { getCategory } from './categories';
 //   amber-500 = color principal         black = texto sobre el color principal
 // (los nombres "slate" y "amber" son heredados del diseño original de la barbería).
 
-export type ThemeKey = 'barberia' | 'spa' | 'clinica' | 'natural';
-export type HeroArt = 'vinyl' | 'ripple' | 'tooth' | 'plate';
+export type ThemeKey = 'barberia' | 'spa' | 'clinica' | 'natural' | 'esencia';
+export type HeroArt = 'vinyl' | 'ripple' | 'tooth' | 'plate' | 'logo';
 
 type Ramp = Record<50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900, string>;
 type Surface = Ramp & { 950: string };
@@ -31,11 +31,17 @@ export interface ThemePreset {
   headingLeading: number; // interlineado de los títulos grandes (Anton es angosta y aguanta 0.95)
   hard: boolean; // sombras duras tipo sticker (true) o sombras suaves (false)
   // Cinta de frases (los valores pueden usar las variables de color, así siguen al color de marca)
-  ticker: { bg: string; fg: string; border: string; style: string; size: string; tracking: string };
+  ticker: { bg: string; fg: string; border: string; style: string; size: string; tracking: string; family: string };
   pole: string; // fondo del encabezado de "cita confirmada"
   grain: number; // textura de grano (0 a 1)
   stamp: string; // color del sello "Reservado" (variable de color)
   art: [string, string, string]; // colores de la ilustración de la portada
+  bgImage: string; // luces suaves de fondo ('none' = fondo liso)
+  glass: boolean; // barras de arriba y de abajo translúcidas, con desenfoque
+  ornament: boolean; // adorno de destello bajo el título de la portada
+  btnGradient: string; // degradado de los botones principales ('none' = color liso)
+  leadFont: string; // letra de las frases de presentación
+  logo: { radius: string; ring: string }; // forma del logo junto al nombre
 }
 
 // ---------- utilidades de color ----------
@@ -146,11 +152,17 @@ export const THEMES: Record<ThemeKey, ThemePreset> = {
     headingWeight: 400,
     headingLeading: 0.95,
     hard: true,
-    ticker: { bg: 'rgb(var(--accent-500))', fg: 'rgb(var(--on-accent))', border: '3px solid rgb(var(--slate-950))', style: 'normal', size: '0.95rem', tracking: '0.08em' },
+    ticker: { bg: 'rgb(var(--accent-500))', fg: 'rgb(var(--on-accent))', border: '3px solid rgb(var(--slate-950))', style: 'normal', size: '0.95rem', tracking: '0.08em', family: 'var(--font-display)' },
     pole: 'repeating-linear-gradient(-45deg, rgb(var(--accent-500)) 0 12px, rgb(var(--slate-950)) 12px 24px)',
     grain: 0.07,
     stamp: '230 57 70',
     art: ['rgb(var(--accent-500))', '#0B0A08', '#1D1A14'],
+    bgImage: 'none',
+    glass: false,
+    ornament: false,
+    btnGradient: 'none',
+    leadFont: 'var(--font-body)',
+    logo: { radius: '0.25rem', ring: 'none' },
   },
 
   // Spa de noche: ciruela profunda y rosa cuarzo, letras de libro y formas suaves
@@ -174,11 +186,17 @@ export const THEMES: Record<ThemeKey, ThemePreset> = {
     headingWeight: 400,
     headingLeading: 1.05,
     hard: false,
-    ticker: { bg: 'rgb(var(--slate-800))', fg: 'rgb(var(--accent-300))', border: '1px solid rgb(var(--accent-500) / 0.35)', style: 'italic', size: '1.05rem', tracking: '0.02em' },
+    ticker: { bg: 'rgb(var(--slate-800))', fg: 'rgb(var(--accent-300))', border: '1px solid rgb(var(--accent-500) / 0.35)', style: 'italic', size: '1.05rem', tracking: '0.02em', family: 'var(--font-display)' },
     pole: 'linear-gradient(135deg, rgb(var(--accent-500)) 0%, rgb(var(--accent-700)) 55%, rgb(var(--slate-700)) 100%)',
     grain: 0,
     stamp: 'var(--accent-500)',
     art: ['rgb(var(--accent-500))', 'rgb(var(--accent-300))', 'rgb(var(--accent-700))'],
+    bgImage: 'radial-gradient(80% 50% at 50% -5%, rgb(var(--accent-500) / 0.16) 0%, transparent 70%), radial-gradient(60% 45% at 100% 100%, rgb(var(--slate-700) / 0.55) 0%, transparent 70%)',
+    glass: true,
+    ornament: true,
+    btnGradient: 'linear-gradient(180deg, rgb(var(--accent-300)) 0%, rgb(var(--accent-500)) 100%)',
+    leadFont: 'var(--font-body)',
+    logo: { radius: '9999px', ring: '0 0 0 1px rgb(var(--accent-500) / 0.6)' },
   },
 
   // Consultorio: porcelana y azul agua, letras redondeadas y limpias
@@ -202,11 +220,17 @@ export const THEMES: Record<ThemeKey, ThemePreset> = {
     headingWeight: 600,
     headingLeading: 1.1,
     hard: false,
-    ticker: { bg: 'rgb(var(--accent-500))', fg: 'rgb(var(--on-accent))', border: '0', style: 'normal', size: '0.9rem', tracking: '0.04em' },
+    ticker: { bg: 'rgb(var(--accent-500))', fg: 'rgb(var(--on-accent))', border: '0', style: 'normal', size: '0.9rem', tracking: '0.04em', family: 'var(--font-display)' },
     pole: 'linear-gradient(135deg, rgb(var(--accent-600)) 0%, rgb(var(--accent-500)) 60%, rgb(var(--accent-200)) 140%)',
     grain: 0,
     stamp: 'var(--accent-500)',
     art: ['rgb(var(--accent-500))', 'rgb(var(--accent-200))', '#FFFFFF'],
+    bgImage: 'radial-gradient(90% 40% at 50% 0%, rgb(var(--accent-500) / 0.1) 0%, transparent 70%)',
+    glass: false,
+    ornament: false,
+    btnGradient: 'none',
+    leadFont: 'var(--font-body)',
+    logo: { radius: 'var(--r-lg)', ring: 'none' },
   },
 
   // Nutrición: avena y verde hoja, letras con calidez y formas orgánicas
@@ -230,11 +254,54 @@ export const THEMES: Record<ThemeKey, ThemePreset> = {
     headingWeight: 700,
     headingLeading: 1.08,
     hard: false,
-    ticker: { bg: 'rgb(var(--accent-500))', fg: '#FDF6E3', border: '0', style: 'italic', size: '1rem', tracking: '0.02em' },
+    ticker: { bg: 'rgb(var(--accent-500))', fg: '#FDF6E3', border: '0', style: 'italic', size: '1rem', tracking: '0.02em', family: 'var(--font-display)' },
     pole: 'linear-gradient(135deg, rgb(var(--accent-600)) 0%, rgb(var(--accent-500)) 55%, #F2A93B 150%)',
     grain: 0,
     stamp: '194 65 12',
     art: ['#3E9B4F', '#F2A93B', '#E4572E'],
+    bgImage: 'radial-gradient(70% 40% at 0% 0%, rgb(242 169 59 / 0.13) 0%, transparent 65%), radial-gradient(60% 40% at 100% 100%, rgb(62 155 79 / 0.1) 0%, transparent 70%)',
+    glass: false,
+    ornament: false,
+    btnGradient: 'none',
+    leadFont: 'var(--font-body)',
+    logo: { radius: 'var(--r-xl)', ring: 'none' },
+  },
+
+  // Estudio boutique (pole, yoga, baile): noche violeta y dorado, tomado del sitio de Pole Essence
+  esencia: {
+    key: 'esencia',
+    label: 'Esencia',
+    mode: 'dark',
+    surface: {
+      50: '#FBF7EE', 100: '#F5EEE0', 200: '#E4DDD6', 300: '#CBC5D6', 400: '#B2ADC8', 500: '#8F89A8',
+      600: '#6A6385', 700: '#4D3E5E', 800: '#352748', 900: '#1A0F37', 950: '#0F0628',
+    },
+    accent: {
+      50: '#FEF8E6', 100: '#FDEFC9', 200: '#FBE3A5', 300: '#F9DA98', 400: '#F3C96F',
+      500: '#ECBD57', 600: '#E4B24A', 700: '#C18E35', 800: '#8E6824', 900: '#523B12',
+    },
+    ink: '#F4E2B8',
+    fonts: {
+      display: "'Cinzel', Georgia, serif",
+      body: "'Jost', system-ui, sans-serif",
+      href: 'https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Jost:wght@400;500;600;700&display=swap',
+    },
+    radius: { lg: '0.6rem', xl: '0.8rem', '2xl': '1rem', '3xl': '1.25rem' },
+    caps: false,
+    headingWeight: 500,
+    headingLeading: 1.12,
+    hard: false,
+    ticker: { bg: 'rgb(var(--slate-900))', fg: 'rgb(var(--accent-300))', border: '1px solid rgb(var(--accent-500) / 0.25)', style: 'italic', size: '1.15rem', tracking: '0.04em', family: "'Cormorant Garamond', Georgia, serif" },
+    pole: 'linear-gradient(135deg, #34125A 0%, #7A1F86 55%, #C14CCA 130%)',
+    grain: 0,
+    stamp: 'var(--accent-500)',
+    art: ['#C14CCA', 'rgb(var(--accent-300))', '#08051C'],
+    bgImage: 'radial-gradient(60% 50% at 50% 0%, #34125A 0%, transparent 70%), radial-gradient(50% 45% at 0% 100%, rgb(120 20 130 / 0.55) 0%, transparent 70%), radial-gradient(50% 45% at 100% 100%, #0C1D4C 0%, transparent 70%)',
+    glass: true,
+    ornament: true,
+    btnGradient: 'linear-gradient(135deg, rgb(var(--accent-300)) 0%, rgb(var(--accent-500)) 50%, rgb(var(--accent-700)) 100%)',
+    leadFont: "'Cormorant Garamond', Georgia, serif",
+    logo: { radius: '9999px', ring: '0 0 0 1px rgb(var(--accent-500)), 0 0 0 4px rgb(var(--accent-500) / 0.15)' },
   },
 };
 
@@ -300,12 +367,19 @@ export const computeTheme = (business: Pick<Business, 'theme' | 'category' | 'br
     '--ticker-style': preset.ticker.style,
     '--ticker-size': preset.ticker.size,
     '--ticker-tracking': preset.ticker.tracking,
+    '--font-ticker': preset.ticker.family,
     '--pole-bg': preset.pole,
     '--grain': String(preset.grain),
     '--stamp': preset.stamp,
     '--art-1': preset.art[0],
     '--art-2': preset.art[1],
     '--art-3': preset.art[2],
+    '--bg-image': preset.bgImage,
+    '--btn-gradient': preset.btnGradient,
+    '--btn-hover': preset.btnGradient === 'none' ? 'none' : 'brightness(1.08)',
+    '--font-lead': preset.leadFont,
+    '--logo-radius': preset.logo.radius,
+    '--logo-ring': preset.logo.ring,
     '--focus': triplet(preset.mode === 'dark' ? accent[300] : accent[500]),
   };
   ([50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const).forEach(step => {
@@ -328,6 +402,8 @@ export const applyTheme = (business: Pick<Business, 'theme' | 'category' | 'bran
   root.dataset.theme = preset.key;
   root.dataset.mode = preset.mode;
   root.dataset.caps = preset.caps ? 'true' : 'false';
+  root.dataset.glass = preset.glass ? 'true' : 'false';
+  root.dataset.ornament = preset.ornament ? 'true' : 'false';
 
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', preset.surface[950]);

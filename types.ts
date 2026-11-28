@@ -32,7 +32,7 @@ export interface Business {
   tiktokUrl: string;
   perks: string[];
   promotions: Promotion[];
-  theme: string; // en blanco = el tema de su giro (barberia, spa, clinica o natural)
+  theme: string; // en blanco = el tema de su giro (barberia, spa, clinica, natural o esencia)
   brandColor: string; // color principal de su marca, como #1A8F6B (en blanco = el del tema)
   logoUrl: string; // logo: link completo (https://...) o archivo de la app (demos/logo.svg)
 }
