@@ -105,7 +105,8 @@ const mapBooking = (row: any): Booking => ({
   waiverAcceptedAt: row.waiver_accepted_at ?? null,
   folio: row.folio || undefined,
   professionalId: row.professional_id ?? null,
-  status: row.status === 'confirmed' ? 'confirmed' : 'pending'
+  status: row.status === 'confirmed' ? 'confirmed' : 'pending',
+  remindedAt: row.reminded_at ?? null
 });
 
 const mapSettings = (row: any): BusinessSettings => ({
@@ -416,6 +417,17 @@ export const setBookingStatus = async (businessId: string, id: string, status: B
   saveToStorage(storageKey('bookings', businessId), bookings.map(b => (b.id === id ? { ...b, status } : b)));
 };
 
+// El negocio marca que ya le mandó el recordatorio al cliente (o lo quita con null)
+export const setBookingReminded = async (businessId: string, id: string, remindedAt: string | null): Promise<void> => {
+  if (isSupabaseEnabled()) {
+    await mutate(`/rest/v1/bookings?id=eq.${id}&business_id=eq.${businessId}`, 'PATCH', { reminded_at: remindedAt });
+    return;
+  }
+
+  const bookings = await getBookings(businessId);
+  saveToStorage(storageKey('bookings', businessId), bookings.map(b => (b.id === id ? { ...b, remindedAt } : b)));
+};
+
 export const deleteBooking = async (businessId: string, id: string): Promise<void> => {
   if (isSupabaseEnabled()) {
     await mutate(`/rest/v1/bookings?id=eq.${id}&business_id=eq.${businessId}`, 'DELETE');
@@ -530,7 +542,7 @@ export const rescheduleMyBooking = async (
     throw new Error('same_slot');
   }
   // Al cambiar el horario, el negocio tiene que confirmarla otra vez
-  bookings[index] = { ...bookings[index], date: date.toISOString(), timeSlot, status: 'pending' };
+  bookings[index] = { ...bookings[index], date: date.toISOString(), timeSlot, status: 'pending', remindedAt: null };
   saveToStorage(key, bookings);
   return id;
 };
