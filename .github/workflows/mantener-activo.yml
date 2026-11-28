@@ -22,9 +22,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          # La dirección y la llave pública salen de constants.ts, así este flujo siempre usa la misma base que la página
-          url=$(grep -oP "url:\s*'\K[^']+" constants.ts | head -n 1 || true)
-          key=$(grep -oP "anonKey:\s*'\K[^']+" constants.ts | head -n 1 || true)
+          # La dirección y la llave pública salen de constants.ts, así este flujo siempre usa la misma base que la página.
+          # Se lee solo el bloque SUPABASE_CONFIG: en ese archivo hay otros "url:" (como el del sitio) y no sirven aquí.
+          bloque=$(sed -n '/SUPABASE_CONFIG/,/^}/p' constants.ts)
+          url=$(printf '%s\n' "$bloque" | grep -oP "url:\s*'\K[^']+" | head -n 1 || true)
+          key=$(printf '%s\n' "$bloque" | grep -oP "anonKey:\s*'\K[^']+" | head -n 1 || true)
           if [ -z "$url" ] || [ -z "$key" ]; then
             echo "No encontré la dirección o la llave de Supabase en constants.ts (SUPABASE_CONFIG)."
             exit 1
